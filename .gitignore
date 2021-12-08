@@ -76,9 +76,7 @@ target/
 .ipynb_checkpoints/
 
 # exclude data from source control by default
-#/data/
-# I want to be able to handle links in here...need to exclude certain file types
-# instead
+/data/
 
 # Mac OS-specific storage files
 .DS_Store
@@ -86,6 +84,9 @@ target/
 # vim
 *.swp
 *.swo
+
+# Emacs
+*~
 
 # Mypy cache
 .mypy_cache/
