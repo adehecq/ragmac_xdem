@@ -1,0 +1,23 @@
+# Experiments and cases
+[experiment_1]
+folder = "experiment_1"
+cases = ["AT_Hintereisferner", "CH_Aletschgletscher", "NO_Vestisen"]
+      
+[experiment_2]
+folder = "experiment_2"
+cases = ["CL_NPI", "PK_Baltoro", "RU_FJL"]
+
+# Path to individual glacier datasets
+["AT_Hintereisferner"]
+ref_dem_path = "AT_Hintereis_Copernicus_REF_DEM.tif"
+rgi_path = "11_rgi60_ceu_wgs84_utm32n.shp"
+selected_path = "11_rgi60_ceu_wgs84_utm32n_hef_selection.shp"
+tdx_path = "TDX_DEM_crp/*dem_mcf.tif"
+aster_path = "ASTER_DEM_Used_only/DEM*tif"
+
+["PK_Baltoro"]
+ref_dem_path = "PK_Baltoro_Copernicus_REF_DEM.tif"
+rgi_path = "14_rgi60_asw_wgs84_utm43n.shp"
+selected_path = "14_rgi60_asw_wgs84_utm43n_baltoro_selection.shp"
+tdx_path = "*dem_mcf.tif"
+aster_path = "DEM*tif"
