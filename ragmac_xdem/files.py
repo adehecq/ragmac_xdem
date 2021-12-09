@@ -16,30 +16,52 @@ cfg = toml.load(os.path.join(BASE_DIR, "ragmac_xdem", "data_tree.toml"))
 DATA_RAW_DIR = os.path.join(BASE_DIR, "data/raw/")
 DATA_PROCESSED_DIR = os.path.join(BASE_DIR, "data/processed/")
 
-# -- Find DEMs for all experiments -- #
+# -- Find raw DEMs for all experiments -- #
 
-# Nested dictionary containing expeiment_number -> case -> path to all needed data sets
+# Nested dictionary containing experiment_number -> case -> path to all needed data sets
 experiments = {}
 for exp in ["experiment_1", "experiment_2"]:
     experiments[exp] = {}
 
+    # Create a dictionary for each case within experiment
     for case in cfg[exp]["cases"]:
         experiments[exp][case] = {}
+        experiments[exp][case]["raw_data"] = {}
+
+        # Save data directory in attributes
         case_dir = os.path.join(DATA_RAW_DIR, cfg[exp]["folder"], case)
+        experiments[exp][case]["raw_data"]["directory"] = case_dir
+
+        # Save the different data attributes
         try:
             for key, value in cfg[case].items():
-                experiments[exp][case][key] = os.path.join(case_dir, value)
+                experiments[exp][case]["raw_data"][key] = os.path.join(case_dir, value)
 
             # Get all TDX DEM files
-            tdx_dems = glob(experiments[exp][case]["tdx_path"])
-            experiments[exp][case]["tdx_dems"] = np.sort(tdx_dems)
+            tdx_dems = glob(experiments[exp][case]["raw_data"]["tdx_path"])
+            experiments[exp][case]["raw_data"]["tdx_dems"] = np.sort(tdx_dems)
 
             # Get all ASTER DEM files
-            aster_dems = glob(experiments[exp][case]["aster_path"])
-            experiments[exp][case]["aster_dems"] = np.sort(aster_dems)
+            aster_dems = glob(experiments[exp][case]["raw_data"]["aster_path"])
+            experiments[exp][case]["raw_data"]["aster_dems"] = np.sort(aster_dems)
 
         except KeyError:
             print(f"Case {case} not implemented")
+
+
+# -- Path to all processed DEMs -- #
+
+for exp in ["experiment_1", "experiment_2"]:
+
+    # Create a dictionary for processed_data
+    for case in cfg[exp]["cases"]:
+        experiments[exp][case]["processed_data"] = {}
+
+        case_dir = os.path.join(DATA_PROCESSED_DIR, cfg[exp]["folder"], case)
+        experiments[exp][case]["processed_data"]["directory"] = case_dir
+
+        experiments[exp][case]["processed_data"]["tdx_dir"] = os.path.join(case_dir, "TDX_DEMs")
+        experiments[exp][case]["processed_data"]["aster_dir"] = os.path.join(case_dir, "ASTER_DEMs")
 
 
 # def check():
