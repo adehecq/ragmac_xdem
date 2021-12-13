@@ -17,10 +17,6 @@ import pandas as pd
 import xdem
 from tqdm import tqdm
 
-# Needed for MacOS with Python >= 3.8
-# See https://stackoverflow.com/questions/60518386/error-with-module-multiprocessing-under-python3-8
-mp.set_start_method("fork")
-
 
 def calculate_stats(ddem, roi_mask, stable_mask):
     """
@@ -186,16 +182,20 @@ def postprocessing_all(
         for dem_path in tqdm(dem_path_list, **pbar_kwargs):
             output = _postproc_wrapper(dem_path)
             results.append(output)
+
     elif nthreads > 1:
+
         if method == "mp":
-            # with mp.Pool(nthreads) as pool:
-            pool = mp.Pool(nthreads)
-            results = list(tqdm(pool.imap(_postproc_wrapper, dem_path_list, chunksize=1), **pbar_kwargs))
-            pool.close()
-            pool.join()
+            # Needed for MacOS with Python >= 3.8
+            # See https://stackoverflow.com/questions/60518386/error-with-module-multiprocessing-under-python3-8
+            cx = mp.get_context("fork")
+            with cx.Pool(nthreads) as pool:
+                results = list(tqdm(pool.imap(_postproc_wrapper, dem_path_list, chunksize=1), **pbar_kwargs))
+
         elif method == "concurrent":
             with concurrent.futures.ThreadPoolExecutor(max_workers=nthreads) as executor:
                 results = list(tqdm(executor.map(_postproc_wrapper, dem_path_list), **pbar_kwargs))
+
     else:
         raise ValueError("nthreads must be >= 1")
 
