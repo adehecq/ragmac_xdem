@@ -191,6 +191,8 @@ def postprocessing_all(
             cx = mp.get_context("fork")
             with cx.Pool(nthreads) as pool:
                 results = list(tqdm(pool.imap(_postproc_wrapper, dem_path_list, chunksize=1), **pbar_kwargs))
+                pool.close()
+                pool.join()
 
         elif method == "concurrent":
             with concurrent.futures.ThreadPoolExecutor(max_workers=nthreads) as executor:
