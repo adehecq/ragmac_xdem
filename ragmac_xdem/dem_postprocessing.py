@@ -6,16 +6,16 @@ from __future__ import annotations
 import concurrent.futures
 import multiprocessing as mp
 import os
-from glob import glob
 import threading
+from glob import glob
 
 import geoutils as gu
+import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import xdem
 from tqdm import tqdm
-import matplotlib as mpl
 
 # Needed for MacOS with Python >= 3.8
 # See https://stackoverflow.com/questions/60518386/error-with-module-multiprocessing-under-python3-8
@@ -134,20 +134,23 @@ def postprocessing_single(
     )
 
 
-
 def postprocessing_all(
-        dem_path_list, ref_dem, roi_outlines, all_outlines, outdir, overwrite: bool = False, plot: bool = False, nthreads: int = 1, method: str = 'mp'
+    dem_path_list,
+    ref_dem,
+    roi_outlines,
+    all_outlines,
+    outdir,
+    overwrite: bool = False,
+    plot: bool = False,
+    nthreads: int = 1,
+    method: str = "mp",
 ):
     """
     Run the postprocessing for all DEMs in dem_path_list.
     """
-    # Create threading locks for files/variables that will be read in multiple threads.
-    if method == "mp":
-        progress_bar_lock = mp.Lock()
-    elif method == "concurrent":
-        progress_bar_lock = threading.Lock()
-    else:
-        raise ValueError(f"method must be either 'mp' or 'concurrent', set to {method}")
+    # Check that chosen method is correct
+    if not method in ["mp", "concurrent"]:
+        raise ValueError(f"method must be either 'mp' or 'concurrent', currently set to '{method}'")
 
     # Create output directory
     if not os.path.exists(outdir):
@@ -159,39 +162,40 @@ def postprocessing_all(
         existing = [os.path.basename(fp).replace("_coreg", "") for fp in existing]
         dem_path_list = [fp for fp in dem_path_list if os.path.basename(fp) not in existing]
 
-    # Create progress bar
-    progress_bar = tqdm(total=len(dem_path_list), desc="Postprocessing DEMs", smoothing=0)
-
     # Needed to avoid errors when plotting on MacOS
-    mpl.use('Agg')
+    mpl.use("Agg")
 
     global _postproc_wrapper
+
     def _postproc_wrapper(dem_path):
         """Postprocess the DEMs in one thread."""
         # Path to outputs
         out_dem_path = os.path.join(outdir, os.path.basename(dem_path).replace(".tif", "_coreg.tif"))
         out_fig = out_dem_path.replace(".tif", "_diff.png")
-        outputs = postprocessing_single(dem_path, ref_dem, roi_outlines, all_outlines, out_dem_path, plot=plot, out_fig=out_fig)
-        with progress_bar_lock:
-            progress_bar.update()
+        outputs = postprocessing_single(
+            dem_path, ref_dem, roi_outlines, all_outlines, out_dem_path, plot=plot, out_fig=out_fig
+        )
         return outputs
+
+    # Arguments to be used for the progress bar
+    pbar_kwargs = {"total": len(dem_path_list), "desc": "Postprocessing DEMs", "smoothing": 0}
 
     # Run with either 1 or several threads
     if nthreads == 1:
         results = []
-        for dem_path in dem_path_list:
+        for dem_path in tqdm(dem_path_list, **pbar_kwargs):
             output = _postproc_wrapper(dem_path)
             results.append(output)
     elif nthreads > 1:
-        if method == 'mp':
-            #with mp.Pool(nthreads) as pool:
+        if method == "mp":
+            # with mp.Pool(nthreads) as pool:
             pool = mp.Pool(nthreads)
-            results = list(pool.map(_postproc_wrapper, dem_path_list, chunksize=1))
+            results = list(tqdm(pool.imap(_postproc_wrapper, dem_path_list, chunksize=1), **pbar_kwargs))
             pool.close()
             pool.join()
-        elif method == 'concurrent':
+        elif method == "concurrent":
             with concurrent.futures.ThreadPoolExecutor(max_workers=nthreads) as executor:
-                results = list(executor.map(_postproc_wrapper, dem_path_list))
+                results = list(tqdm(executor.map(_postproc_wrapper, dem_path_list), **pbar_kwargs))
     else:
         raise ValueError("nthreads must be >= 1")
 
