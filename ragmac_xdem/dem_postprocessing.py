@@ -15,6 +15,7 @@ import numpy as np
 import pandas as pd
 import xdem
 from tqdm import tqdm
+import matplotlib as mpl
 
 # Needed for MacOS with Python >= 3.8
 # See https://stackoverflow.com/questions/60518386/error-with-module-multiprocessing-under-python3-8
@@ -135,7 +136,7 @@ def postprocessing_single(
 
 
 def postprocessing_all(
-        dem_path_list, ref_dem, roi_outlines, all_outlines, outdir, overwrite: bool = False, nthreads: int = 1, method: str = 'mp'
+        dem_path_list, ref_dem, roi_outlines, all_outlines, outdir, overwrite: bool = False, plot: bool = False, nthreads: int = 1, method: str = 'mp'
 ):
     """
     Run the postprocessing for all DEMs in dem_path_list.
@@ -161,13 +162,16 @@ def postprocessing_all(
     # Create progress bar
     progress_bar = tqdm(total=len(dem_path_list), desc="Postprocessing DEMs", smoothing=0)
 
+    # Needed to avoid errors when plotting on MacOS
+    mpl.use('Agg')
+
     global _postproc_wrapper
     def _postproc_wrapper(dem_path):
         """Postprocess the DEMs in one thread."""
         # Path to outputs
         out_dem_path = os.path.join(outdir, os.path.basename(dem_path).replace(".tif", "_coreg.tif"))
         out_fig = out_dem_path.replace(".tif", "_diff.png")
-        outputs = postprocessing_single(dem_path, ref_dem, roi_outlines, all_outlines, out_dem_path, plot=False, out_fig=out_fig)
+        outputs = postprocessing_single(dem_path, ref_dem, roi_outlines, all_outlines, out_dem_path, plot=plot, out_fig=out_fig)
         with progress_bar_lock:
             progress_bar.update()
         return outputs
