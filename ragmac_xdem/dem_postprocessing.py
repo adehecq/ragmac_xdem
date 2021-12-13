@@ -8,6 +8,7 @@ import multiprocessing as mp
 import os
 import threading
 from glob import glob
+from typing import Callable
 
 import geoutils as gu
 import matplotlib as mpl
@@ -17,21 +18,32 @@ import pandas as pd
 import xdem
 from tqdm import tqdm
 
+# Turn off imshow's interpolation to avoid gaps spread in plots
+plt.rcParams["image.interpolation"] = "none"
+
 
 def calculate_stats(ddem, roi_mask, stable_mask):
     """
     Returns main statistics of ddem:
     fraction of coverage over glacier, number of obs, NMAD and median dh over stable terrain
+    Warning: ddems may contain NaNs on top of nodata values.
     """
+    # Get array of valid data (no nodata, no nan) and mask
+    data, mask = gu.spatial_tools.get_array_and_mask(ddem)
+
+    # Make sure input masks are 2D
+    roi_mask = roi_mask.squeeze()
+    stable_mask = stable_mask.squeeze()
+
     # Calculate coverage over glaciers
-    nobs = np.sum(~ddem.data.mask[roi_mask])
+    nobs = np.sum(~mask[roi_mask])
     ntot = np.sum(roi_mask)
     roi_coverage = nobs / ntot
 
     # Calculate statistics in stable terrain
-    nstable = np.sum(~ddem.data.mask[stable_mask])
-    nmad_stable = xdem.spatialstats.nmad(ddem.data[stable_mask])
-    med_stable = np.ma.median(ddem.data[stable_mask])
+    nstable = np.sum(~mask[stable_mask])
+    nmad_stable = xdem.spatialstats.nmad(data[stable_mask])
+    med_stable = np.nanmedian(data[stable_mask])
 
     return roi_coverage, nstable, med_stable, nmad_stable
 
@@ -119,6 +131,7 @@ def postprocessing_single(
 
     return (
         os.path.basename(dem_path),
+        out_dem_path,
         nstable_orig,
         med_orig,
         nmad_orig,
@@ -159,6 +172,7 @@ def postprocessing_all(
         dem_path_list = [fp for fp in dem_path_list if os.path.basename(fp) not in existing]
 
     # Needed to avoid errors when plotting on MacOS
+    old_backend = mpl.get_backend()
     mpl.use("Agg")
 
     global _postproc_wrapper
@@ -201,24 +215,41 @@ def postprocessing_all(
     else:
         raise ValueError("nthreads must be >= 1")
 
-    # # -- Save generic stats to file -- #
+    # Revert to original backend
+    mpl.use(old_backend)
 
-    # # Convert output data to DataFrame
-    # df = pd.DataFrame(results, columns=["ID", "nstable_orig", "med_orig", "nmad_orig", "roi_cover_orig", "nstable_coreg", "med_coreg", "nmad_coreg", "roi_cover_coreg"])
+    # -- Save generic stats to file -- #
 
-    # # Read stats from previous run
-    # stats_file = outdir + "/coreg_stats.txt"
-    # if os.path.exists(stats_file) & (not overwrite):
-    #     df_previous = pd.read_csv(stats_file)
-    #     out_df = (
-    #         pd.concat((df_previous, df), ignore_index=True)
-    #         .drop_duplicates(keep="last", subset=["ID"])
-    #         .sort_values(by=["ID"])
-    #     )
-    # else:
-    #     out_df = df
+    # Convert output data to DataFrame
+    df = pd.DataFrame(
+        results,
+        columns=[
+            "ID",
+            "coreg_path",
+            "nstable_orig",
+            "med_orig",
+            "nmad_orig",
+            "roi_cover_orig",
+            "nstable_coreg",
+            "med_coreg",
+            "nmad_coreg",
+            "roi_cover_coreg",
+        ],
+    )
 
-    # # Save concatenated output to file
-    # out_df.to_csv(stats_file, index=False, float_format="%.2f")
+    # Read stats from previous run
+    stats_file = outdir + "/coreg_stats.txt"
+    if os.path.exists(stats_file) & (not overwrite):
+        df_previous = pd.read_csv(stats_file)
+        out_df = (
+            pd.concat((df_previous, df), ignore_index=True)
+            .drop_duplicates(keep="last", subset=["ID"])
+            .sort_values(by=["ID"])
+        )
+    else:
+        out_df = df
 
-    return results
+    # Save concatenated output to file
+    out_df.to_csv(stats_file, index=False, float_format="%.2f")
+
+    return out_df
