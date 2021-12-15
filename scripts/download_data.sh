@@ -7,13 +7,13 @@ DATA_URL=https://www.geo.uzh.ch/microsite/ragmac_experiment_data/files/
 # Path to scripts base folder and target data directory
 SCRIPT_DIR=$(cd $(dirname "${BASH_SOURCE[0]}") && pwd)
 BASE_DIR=$(dirname $SCRIPT_DIR)
-TARGET_DIR=$BASE_DIR/data3/raw
+TARGET_DIR=$BASE_DIR/data/raw
 
 # Check that target directory is empty, to not overwrite
 if [ "$(ls -A $TARGET_DIR )" ]; then echo "Target directory not empty -> exiting"; exit; fi
 
 # Download data
-cmd="wget -r -nH --cut-dirs=3 --no-parent --reject='index.html*' $DATA_URL -P $TARGET_DIR"
+cmd="wget -r -nH --cut-dirs=3 --no-parent --reject='index.html*' --no-check-certificate $DATA_URL -P $TARGET_DIR"
 echo -e "\n*** Running command: $cmd\n"; $cmd
 
 # Unzipping archives
