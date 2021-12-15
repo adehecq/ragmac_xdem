@@ -225,7 +225,7 @@ def postprocessing_single(
 
     # Filter outliers based on reference DEM
     outlier_mask = spatial_filter_ref_iter(ref_dem.data.squeeze(), dem_coreg.data.squeeze(), res=ref_dem.res[0], plot=False)
-    dem_coreg.data.mask[outlier_mask] = True
+    dem_coreg.data.mask[0, outlier_mask] = True
 
     # Save plots
     if plot:
