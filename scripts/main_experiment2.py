@@ -8,13 +8,22 @@ import os
 import geoutils as gu
 import numpy as np
 import xdem
+import matplotlib.pyplot as plt
+import argparse
 
 import ragmac_xdem.dem_postprocessing as pproc
 from ragmac_xdem import utils
+from ragmac_xdem import mass_balance as mb
 
 if __name__ == "__main__":
 
-    nproc = mp.cpu_count() - 1
+    # -- Setup script arguments -- #
+    parser = argparse.ArgumentParser(description="Process all the data and figures for experiment 2")
+
+    parser.add_argument('-overwrite', dest='overwrite', action='store_true', help="If set, will overwrite already processed data")
+    parser.add_argument('-nproc', dest='nproc', type=int, default= mp.cpu_count() - 1, help='int, number of processes to be run in parallel whenever possible (Default is max CPU - 1)')
+
+    args = parser.parse_args()
 
     # -- Load input data -- #
     from ragmac_xdem import files
@@ -63,8 +72,8 @@ if __name__ == "__main__":
         roi_outlines,
         all_outlines,
         outdir,
-        nthreads=nproc,
-        overwrite=False,
+        nthreads=args.nproc,
+        overwrite=args.overwrite,
         plot=True,
         method="mp",
     )
@@ -96,3 +105,26 @@ if __name__ == "__main__":
     )
     ddem_2019 = ref_dem - mosaic_2019
     cov_2019, _, med_2019, nmad_2019 = pproc.calculate_stats(ddem_2019, roi_mask, stable_mask)
+
+    # -- Calculate elevation change for all periods -- #
+    ddem_2000_2012 = mosaic_2012 - mosaic_2000
+    ddem_2012_2019 = mosaic_2019 - mosaic_2012
+
+    plt.figure(figsize=(18, 8))
+    ax1 = plt.subplot(121)
+    roi_outlines.ds.plot(ax=ax1, facecolor='none', edgecolor='k', zorder=2)
+    ddem_2000_2012.show(ax=ax1, cmap='coolwarm_r', vmin=-50, vmax=50, cb_title="Elevation change (m)", zorder=1)
+    ax1.set_title("2000 - 2012")
+
+    ax2 = plt.subplot(122)
+    roi_outlines.ds.plot(ax=ax2, facecolor='none', edgecolor='k', zorder=2)
+    ddem_2012_2019.show(ax=ax2, cmap='coolwarm_r', vmin=-50, vmax=50, cb_title="Elevation change (m)", zorder=1)
+    ax2.set_title("2012 - 2019")
+
+    plt.tight_layout()
+    plt.show()
+
+    # Calculating MB
+    ddem_bins, bins_area, frac_obs, dV, dh_mean = mb.mass_balance_local_hypso(ddem_2000_2012, ref_dem, roi_mask, plot=True)
+
+    ddem_bins, bins_area, frac_obs, dV, dh_mean = mb.mass_balance_local_hypso(ddem_2012_2019, ref_dem, roi_mask, plot=True)
