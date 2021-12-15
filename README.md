@@ -9,9 +9,23 @@ ragmac_xdem
 
 Scripts to calculate glacier mass balance as part of the IACS RAGMAC Intercomparison experiment.
 
-See some test code in folder scripts.
 
-More info to come !
+## Get started
+
+### Install package
+```
+git clone git@github.com:adehecq/ragmac_xdem.git ragmac_xdem
+cd ragmac_xdem/
+conda env create -f environment.yml  # Optional, mostly xdem need to be installed
+conda activate ragmac_xdem           # Optional
+pip install -e .
+```
+
+### Download data in ./data/raw folder
+`./scripts/download_data.sh`
+
+## Process data for experiment 2 - WIP
+`python ./scripts/main_experiment2.py`
 
 --------
 
