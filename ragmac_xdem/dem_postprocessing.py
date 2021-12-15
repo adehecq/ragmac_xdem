@@ -18,6 +18,10 @@ import pandas as pd
 import xdem
 from tqdm import tqdm
 
+import cv2
+from skimage.morphology import disk
+
+
 # Turn off imshow's interpolation to avoid gaps spread in plots
 plt.rcParams["image.interpolation"] = "none"
 
@@ -46,6 +50,121 @@ def calculate_stats(ddem, roi_mask, stable_mask):
     med_stable = np.nanmedian(data[stable_mask])
 
     return roi_coverage, nstable, med_stable, nmad_stable
+
+
+def nmad_filter(
+    dh_array: np.ndarray, inlier_mask: np.ndarray, nmad_factor: float = 5, max_iter: int = 20, verbose: bool = False
+) -> np.ndarray:
+    """
+    Iteratively remove pixels where the elevation difference (dh_array) in stable terrain (inlier_mask) is larger \
+    than nmad_factor * NMAD.
+    Iterations will stop either when the NMAD change is less than 0.1, or after max_iter iterations.
+
+    :params dh_array: 2D array of elevation difference.
+    :params inlier_mask: 2D boolean array of areas to include in the analysis (inliers=True).
+    :param nmad_factor: The factor by which the stable dh NMAD has to be multiplied to calculate the outlier threshold
+    :param max_iter: Maximum number of iterations (normally not reached, just for safety)
+    :param verbose: set to True to print some statistics to screen.
+
+    :returns: 2D boolean array with updated inliers set to True
+    """
+    # Mask unstable terrain
+    dh_stable = dh_array.copy()
+    dh_stable.mask[~inlier_mask] = True
+    nmad_before = xdem.spatialstats.nmad(dh_stable)
+    if verbose:
+        print(f"NMAD before: {nmad_before:.2f}")
+        print("Iteratively remove large outliers")
+
+    # Iteratively remove large outliers
+    for i in range(max_iter):
+        outlier_threshold = nmad_factor * nmad_before
+        dh_stable.mask[np.abs(dh_stable) > outlier_threshold] = True
+        nmad_after = xdem.spatialstats.nmad(dh_stable)
+        if verbose:
+            print(f"Remove pixels where abs(value) > {outlier_threshold:.2f} -> New NMAD: {nmad_after:.2f}")
+
+        # If NMAD change is loweer than a set threshold, stop iterations, otherwise stop after max_iter
+        if nmad_before - nmad_after < 0.1:
+            break
+
+        nmad_before = nmad_after
+
+    return ~dh_stable.mask
+
+
+def spatial_filter_ref(ref_dem: np.ndarray, src_dem: np.ndarray, radius_pix: float, dh_thresh: float) -> np.ndarray:
+    """
+    Masks all values where src_dem < min_ref - dh_thresh & src_dem > max_ref + dh_thresh.
+    where min_ref and max_ref are the min/max elevation of ref_dem within radius.
+
+    :param ref_dem: 2D array containing the reference elevation.
+    :param src_dem: 2D array containing the DEM to be filtered, of same size as ref_dem.
+    :param radius_pix: the radius of the disk where to calculate min/max ref elevation.
+    :param dh_thresh: the second elevation can be this far below/above the min/max ref elevation.
+
+    :returns: a boolean 2D array set to True for pixels to be masked
+    """
+    # Sanity check
+    assert ref_dem.shape == src_dem.shape, "Input arrays have different shape"
+    assert np.ndim(ref_dem) == np.ndim(src_dem), "Input arrays must be of dimension 2"
+
+    # Calculate ref min.max elevation in given radius
+    max_elev = cv2.dilate(ref_dem, kernel=disk(radius_pix))
+    min_elev = cv2.erode(ref_dem, kernel=disk(radius_pix))
+
+    # Pixels to be masked
+    mask = np.zeros(ref_dem.shape, dtype="bool")
+    mask[src_dem < min_elev - dh_thresh] = True
+    mask[src_dem > max_elev + dh_thresh] = True
+
+    return mask
+
+
+def spatial_filter_ref_iter(
+    ref_dem: np.ndarray, src_dem: np.ndarray, res: float, plot: bool = False, vmax: float = 50
+) -> np.ndarray:
+    """
+    Apply spatial_filter_ref with iterative hard-coded thresholds, as in Hugonnet et al. (2021) - S1:
+    radius, dh_cutoff = (200, 700), (500, 500), (1000, 300).
+
+    :param ref_dem: 2D array containing the reference elevation.
+    :param src_dem: 2D array containing the DEM to be filtered, of same size as ref_dem.
+    :param res: DEm resolution in meters.
+    :param plot: set to True to display intermediate results.
+    :param vmax: maximum color scale value, if plot = True.
+
+    :returns: a boolean 2D array set to True for pixels to be masked.
+    """
+    mask = np.zeros(ref_dem.shape, dtype="bool")
+
+    for radius, dh_cutoff in zip((200, 500, 1000), (700, 500, 300)):
+
+        radius_pix = int(np.ceil(radius / res))
+        mask += spatial_filter_ref(ref_dem, src_dem, radius_pix, dh_cutoff)
+
+        if plot:
+            dh = ref_dem - src_dem
+            dh_filtered = np.ma.where(mask, np.nan, dh)
+
+            plt.figure(figsize=(16, 8))
+
+            ax1 = plt.subplot(121)
+            plt.imshow(dh, cmap="coolwarm_r", vmin=-vmax, vmax=vmax)
+            cb = plt.colorbar()
+            cb.set_label("Elevation change (m)")
+            plt.title("Initial dh")
+
+            plt.subplot(122, sharex=ax1, sharey=ax1)
+            plt.imshow(dh_filtered, cmap="coolwarm_r", vmin=-vmax, vmax=vmax)
+            cb = plt.colorbar()
+            cb.set_label("Elevation change (m)")
+            plt.title(f"Filtered dh - radius = {radius}, dh_cutoff = {dh_cutoff}")
+
+            plt.tight_layout()
+            plt.show()
+
+    return mask
 
 
 def postprocessing_single(
@@ -85,6 +204,12 @@ def postprocessing_single(
     # Calculate dDEM
     ddem = dem - ref_dem
 
+    # Filter gross outliers in stable terrain
+    inlier_mask = nmad_filter(ddem.data, stable_mask, verbose=False)
+    outlier_mask = ~inlier_mask & stable_mask
+    ddem.data.mask[outlier_mask] = True
+    del inlier_mask
+
     # Calculate coverage on and off ice
     roi_coverage_orig, nstable_orig, med_orig, nmad_orig = calculate_stats(ddem, roi_mask, stable_mask)
 
@@ -97,6 +222,10 @@ def postprocessing_single(
 
     # Calculate new stats
     roi_coverage_coreg, nstable_coreg, med_coreg, nmad_coreg = calculate_stats(ddem_coreg, roi_mask, stable_mask)
+
+    # Filter outliers based on reference DEM
+    outlier_mask = spatial_filter_ref_iter(ref_dem.data.squeeze(), dem_coreg.data.squeeze(), res=ref_dem.res[0], plot=False)
+    dem_coreg.data.mask[outlier_mask] = True
 
     # Save plots
     if plot:
