@@ -78,6 +78,7 @@ if __name__ == "__main__":
         method="mp",
     )
     coreg_dems_files = np.asarray(stats["coreg_path"])
+    print(f"--> Coregistered DEMs saved in {outdir}")
 
     # -- Merge DEMs by period -- #
     print("\n### Merge DEMs ###")
@@ -125,6 +126,10 @@ if __name__ == "__main__":
     plt.show()
 
     # Calculating MB
+    print("\n### Mass balance 2000 - 2012 ###")
     ddem_bins, bins_area, frac_obs, dV, dh_mean = mb.mass_balance_local_hypso(ddem_2000_2012, ref_dem, roi_mask, plot=True)
+    print(f"Total volume: {dV:.1f} km3 - mean dh: {dh_mean:.2f} m")
 
+    print("\n### Mass balance 2012 - 2019 ###")
     ddem_bins, bins_area, frac_obs, dV, dh_mean = mb.mass_balance_local_hypso(ddem_2012_2019, ref_dem, roi_mask, plot=True)
+    print(f"Total volume: {dV:.1f} km3 - mean dh: {dh_mean:.2f} m")

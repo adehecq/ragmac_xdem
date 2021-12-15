@@ -50,7 +50,7 @@ def mass_balance_local_hypso(ddem, ref_dem, roi_mask, plot=True, outfig=None):
         ax1 = plt.subplot(111)
         p1 = plt.plot(ddem_bins["value"], ddem_bins.index.mid, linestyle="-", zorder=1)
         p1b = plt.plot(ddem_bins_filled["value"], ddem_bins.index.mid, linestyle=":", zorder=1)
-        plt.xlabel("Elevation change (m/a)")
+        plt.xlabel("Elevation change (m)")
         plt.ylabel("Elevation (m)")
         
         ax2 = ax1.twiny()
