@@ -46,7 +46,7 @@ if __name__ == "__main__":
     from ragmac_xdem import files
 
     baltoro_exp = files.experiments["experiment_2"]["PK_Baltoro"]
-    stop
+
     # Load reference DEM
     ref_dem = xdem.DEM(baltoro_exp["raw_data"]["ref_dem_path"])
 
