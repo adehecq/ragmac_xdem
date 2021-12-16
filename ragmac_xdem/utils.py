@@ -22,6 +22,16 @@ def get_aster_date(fname):
     return base + timedelta(seconds=ndays.total_seconds() * decimals)
 
 
+def get_tdx_date(fname):
+    """Parse the date of a TDX DEM from the filename"""
+    # Extract string containing date and time
+    basename = os.path.basename(fname)
+    datetime_str = basename[:17]
+
+    # Convert to datetime
+    return datetime.strptime(datetime_str,'%Y-%m-%d_%H%M%S')
+
+
 def select_dems_by_date(dem_path_list: list[str], date1: str, date2: str, sat_type: str) -> list:
     """
     Returns the list of files which date falls within date1 and date 2 (included)
@@ -36,7 +46,7 @@ def select_dems_by_date(dem_path_list: list[str], date1: str, date2: str, sat_ty
     if sat_type == "ASTER":
         dates = np.asarray([get_aster_date(dem_file) for dem_file in dem_path_list])
     elif sat_type == "TDX":
-        raise NotImplementedError
+        dates = np.asarray([get_tdx_date(dem_file) for dem_file in dem_path_list])
     else:
         raise ValueError("sat_type must be 'ASTER' or 'TDX'")
 
