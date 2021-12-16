@@ -35,7 +35,10 @@ for exp in ["experiment_1", "experiment_2"]:
         # Save the different data attributes
         try:
             for key, value in cfg[case].items():
-                experiments[exp][case]["raw_data"][key] = os.path.join(case_dir, value)
+                if key.__contains__("path"):
+                    experiments[exp][case]["raw_data"][key] = os.path.join(case_dir, value)
+                else:
+                    experiments[exp][case][key] = value
 
             # Get all TDX DEM files
             tdx_dems = glob(experiments[exp][case]["raw_data"]["tdx_path"])
