@@ -1,8 +1,9 @@
-"""Various utilites"""
+"""Various utilities"""
 
 import os
-from datetime import datetime, timedelta
 import re
+
+from datetime import datetime, timedelta
 
 import numpy as np
 
@@ -30,7 +31,7 @@ def get_tdx_date(fname: str) -> datetime:
     datetime_str = basename[:17]
 
     # Convert to datetime
-    return datetime.strptime(datetime_str, '%Y-%m-%d_%H%M%S')
+    return datetime.strptime(datetime_str, "%Y-%m-%d_%H%M%S")
 
 
 def get_dems_date(dem_path_list: list[str]) -> list:

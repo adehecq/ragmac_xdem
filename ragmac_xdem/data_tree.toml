@@ -2,7 +2,7 @@
 [experiment_1]
 folder = "experiment_1"
 cases = ["AT_Hintereisferner", "CH_Aletschgletscher", "NO_Vestisen"]
-      
+
 [experiment_2]
 folder = "experiment_2"
 cases = ["CL_NPI", "PK_Baltoro", "RU_FJL"]

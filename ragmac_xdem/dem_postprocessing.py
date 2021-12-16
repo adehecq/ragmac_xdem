@@ -7,19 +7,20 @@ import concurrent.futures
 import multiprocessing as mp
 import os
 import threading
+
 from glob import glob
 from typing import Callable
 
+import cv2
 import geoutils as gu
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import xdem
-from tqdm import tqdm
 
-import cv2
 from skimage.morphology import disk
+from tqdm import tqdm
 
 
 # Turn off imshow's interpolation to avoid gaps spread in plots
@@ -224,7 +225,9 @@ def postprocessing_single(
     roi_coverage_coreg, nstable_coreg, med_coreg, nmad_coreg = calculate_stats(ddem_coreg, roi_mask, stable_mask)
 
     # Filter outliers based on reference DEM
-    outlier_mask = spatial_filter_ref_iter(ref_dem.data.squeeze(), dem_coreg.data.squeeze(), res=ref_dem.res[0], plot=False)
+    outlier_mask = spatial_filter_ref_iter(
+        ref_dem.data.squeeze(), dem_coreg.data.squeeze(), res=ref_dem.res[0], plot=False
+    )
     dem_coreg.data.mask[0, outlier_mask] = True
 
     # Save plots

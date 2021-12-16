@@ -2,27 +2,43 @@
 The main script to be run for experiment_2
 """
 
+import argparse
 import multiprocessing as mp
 import os
 
 import geoutils as gu
+import matplotlib.pyplot as plt
 import numpy as np
 import xdem
-import matplotlib.pyplot as plt
-import argparse
 
 import ragmac_xdem.dem_postprocessing as pproc
-from ragmac_xdem import utils
+
 from ragmac_xdem import mass_balance as mb
+from ragmac_xdem import utils
+
 
 if __name__ == "__main__":
 
     # -- Setup script arguments -- #
     parser = argparse.ArgumentParser(description="Process all the data and figures for experiment 2")
 
-    parser.add_argument('-sat', dest='sat_type', type=str, default="ASTER", help="str, the satellite data to be used, either 'ASTER', 'TDX' or 'both'")
-    parser.add_argument('-overwrite', dest='overwrite', action='store_true', help="If set, will overwrite already processed data")
-    parser.add_argument('-nproc', dest='nproc', type=int, default= mp.cpu_count() - 1, help='int, number of processes to be run in parallel whenever possible (Default is max CPU - 1)')
+    parser.add_argument(
+        "-sat",
+        dest="sat_type",
+        type=str,
+        default="ASTER",
+        help="str, the satellite data to be used, either 'ASTER', 'TDX' or 'both'",
+    )
+    parser.add_argument(
+        "-overwrite", dest="overwrite", action="store_true", help="If set, will overwrite already processed data"
+    )
+    parser.add_argument(
+        "-nproc",
+        dest="nproc",
+        type=int,
+        default=mp.cpu_count() - 1,
+        help="int, number of processes to be run in parallel whenever possible (Default is max CPU - 1)",
+    )
 
     args = parser.parse_args()
 
@@ -30,7 +46,7 @@ if __name__ == "__main__":
     from ragmac_xdem import files
 
     baltoro_exp = files.experiments["experiment_2"]["PK_Baltoro"]
-
+    stop
     # Load reference DEM
     ref_dem = xdem.DEM(baltoro_exp["raw_data"]["ref_dem_path"])
 
@@ -128,13 +144,13 @@ if __name__ == "__main__":
     plt.figure(figsize=(18, 8))
     ax1 = plt.subplot(121)
     if args.sat_type == "ASTER":
-        roi_outlines.ds.plot(ax=ax1, facecolor='none', edgecolor='k', zorder=2)
-        ddem_2000_2012.show(ax=ax1, cmap='coolwarm_r', vmin=-50, vmax=50, cb_title="Elevation change (m)", zorder=1)
+        roi_outlines.ds.plot(ax=ax1, facecolor="none", edgecolor="k", zorder=2)
+        ddem_2000_2012.show(ax=ax1, cmap="coolwarm_r", vmin=-50, vmax=50, cb_title="Elevation change (m)", zorder=1)
         ax1.set_title("2000 - 2012")
 
     ax2 = plt.subplot(122)
-    roi_outlines.ds.plot(ax=ax2, facecolor='none', edgecolor='k', zorder=2)
-    ddem_2012_2019.show(ax=ax2, cmap='coolwarm_r', vmin=-50, vmax=50, cb_title="Elevation change (m)", zorder=1)
+    roi_outlines.ds.plot(ax=ax2, facecolor="none", edgecolor="k", zorder=2)
+    ddem_2012_2019.show(ax=ax2, cmap="coolwarm_r", vmin=-50, vmax=50, cb_title="Elevation change (m)", zorder=1)
     ax2.set_title("2012 - 2019")
 
     plt.tight_layout()
@@ -143,9 +159,13 @@ if __name__ == "__main__":
     # Calculating MB
     if args.sat_type == "ASTER":
         print("\n### Mass balance 2000 - 2012 ###")
-        ddem_bins, bins_area, frac_obs, dV, dh_mean = mb.mass_balance_local_hypso(ddem_2000_2012, ref_dem, roi_mask, plot=True)
+        ddem_bins, bins_area, frac_obs, dV, dh_mean = mb.mass_balance_local_hypso(
+            ddem_2000_2012, ref_dem, roi_mask, plot=True
+        )
         print(f"Total volume: {dV:.1f} km3 - mean dh: {dh_mean:.2f} m")
 
     print("\n### Mass balance 2012 - 2019 ###")
-    ddem_bins, bins_area, frac_obs, dV, dh_mean = mb.mass_balance_local_hypso(ddem_2012_2019, ref_dem, roi_mask, plot=True)
+    ddem_bins, bins_area, frac_obs, dV, dh_mean = mb.mass_balance_local_hypso(
+        ddem_2012_2019, ref_dem, roi_mask, plot=True
+    )
     print(f"Total volume: {dV:.1f} km3 - mean dh: {dh_mean:.2f} m")

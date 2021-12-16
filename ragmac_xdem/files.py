@@ -1,10 +1,12 @@
 """Important info on all files to be processed"""
 
 import os
+
 from glob import glob
 
 import numpy as np
 import toml
+
 
 # Base directory of the project
 BASE_DIR = os.path.abspath(os.path.join(os.path.join(os.path.dirname(__file__), os.path.pardir)))

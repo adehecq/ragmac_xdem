@@ -19,7 +19,7 @@ quiet = false
 color = true
 
 [tool.isort]
-known_third_party = ["numpy", "pytest", "setuptools"]
+known_third_party = ["cv2", "geoutils", "matplotlib", "numpy", "pandas", "pkg_resources", "setuptools", "skimage", "toml", "tqdm", "xdem"]
 
 [tool.pytest.ini_options]
 minversion = "6.0"
