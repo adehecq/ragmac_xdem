@@ -52,10 +52,10 @@ def get_dems_date(dem_path_list: list[str]) -> list:
         # Identify satellite type
         if re.match("DEM\S*", basename):
             sat_type = "ASTER"
-        elif re.match("\S*dem_mcf.tif", basename) is not None:
+        elif re.match("\S*dem_mcf\S*", basename) is not None:
             sat_type = "TDX"
         else:
-            print("Could not identify satellite type")
+            raise ValueError("Could not identify satellite type")
 
         # Get date
         if sat_type == "ASTER":

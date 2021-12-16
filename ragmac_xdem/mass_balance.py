@@ -48,6 +48,7 @@ def mass_balance_local_hypso(ddem, ref_dem, roi_mask, plot=True, outfig=None):
     if plot:
         bin_width = ddem_bins.index.left - ddem_bins.index.right
 
+        plt.figure(figsize=(8, 8))
         ax1 = plt.subplot(111)
         p1 = plt.plot(ddem_bins["value"], ddem_bins.index.mid, linestyle="-", zorder=1)
         p1b = plt.plot(ddem_bins_filled["value"], ddem_bins.index.mid, linestyle=":", zorder=1)

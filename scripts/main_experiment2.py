@@ -5,6 +5,7 @@ The main script to be run for experiment_2
 import argparse
 import multiprocessing as mp
 import os
+import warnings
 
 import geoutils as gu
 import matplotlib.pyplot as plt
@@ -76,21 +77,13 @@ if __name__ == "__main__":
         os.makedirs(outdir)
 
     # -- Select DEMs to be processed -- #
-    inds_2000 = utils.select_dems_by_date(dems_files, "2000-01-01", "2000-12-31", sat_type=args.sat_type)
-    inds_2012 = utils.select_dems_by_date(dems_files, "2012-01-01", "2012-12-31", sat_type=args.sat_type)
-    inds_2019 = utils.select_dems_by_date(dems_files, "2019-01-01", "2019-12-31", sat_type=args.sat_type)
-    inds_all = np.asarray([*inds_2000, *inds_2012, *inds_2019])
+    print("\n### DEMs selection ###")
+    validation_dates = baltoro_exp["validation_dates"]
+    groups = utils.dems_selection(dems_files, validation_dates, dt=365)
+    dems_files = [item for sublist in groups for item in sublist]
 
-    # Update list of DEMs and indices
-    dems_files = dems_files[inds_all]
-    if args.sat_type == "ASTER":
-        inds_2000 = inds_2000 - inds_2000[0]
-        inds_2012 = inds_2012 - inds_2012[0] + inds_2000[-1] + 1
-        inds_2019 = inds_2019 - inds_2019[0] + inds_2012[-1] + 1
-    elif args.sat_type == "TDX":
-        inds_2000 = []
-        inds_2012 = inds_2012 - inds_2012[0]
-        inds_2019 = inds_2019 - inds_2019[0] + inds_2012[-1] + 1
+    for date, group in zip(validation_dates, groups):
+        print(f"For date {date} found {len(group)} DEMs")
 
     # -- Postprocess DEMs i.e. coregister, filter etc -- #
     print("\n### Coregister DEMs ###")
@@ -106,66 +99,68 @@ if __name__ == "__main__":
         method="mp",
     )
     coreg_dems_files = np.asarray(stats["coreg_path"])
+    groups_coreg = utils.dems_selection(coreg_dems_files, validation_dates, dt=365)
     print(f"--> Coregistered DEMs saved in {outdir}")
 
     # -- Merge DEMs by period -- #
     print("\n### Merge DEMs ###")
 
-    # 2000
-    if args.sat_type == "ASTER":
-        dem_objs = [xdem.DEM(dem_path, load_data=False) for dem_path in coreg_dems_files[inds_2000]]
-        mosaic_2000 = gu.spatial_tools.merge_rasters(
-            dem_objs, reference=ref_dem, merge_algorithm=np.nanmedian, use_ref_bounds=True
-        )
-        ddem_2000 = ref_dem - mosaic_2000
-        cov_2000, _, med_2000, nmad_2000 = pproc.calculate_stats(ddem_2000, roi_mask, stable_mask)
-
-    # 2012
-    dem_objs = [xdem.DEM(dem_path, load_data=False) for dem_path in coreg_dems_files[inds_2012]]
-    mosaic_2012 = gu.spatial_tools.merge_rasters(
-        dem_objs, reference=ref_dem, merge_algorithm=np.nanmedian, use_ref_bounds=True
-    )
-    ddem_2012 = ref_dem - mosaic_2012
-    cov_2012, _, med_2012, nmad_2012 = pproc.calculate_stats(ddem_2012, roi_mask, stable_mask)
-
-    # 2019
-    dem_objs = [xdem.DEM(dem_path, load_data=False) for dem_path in coreg_dems_files[inds_2019]]
-    mosaic_2019 = gu.spatial_tools.merge_rasters(
-        dem_objs, reference=ref_dem, merge_algorithm=np.nanmedian, use_ref_bounds=True
-    )
-    ddem_2019 = ref_dem - mosaic_2019
-    cov_2019, _, med_2019, nmad_2019 = pproc.calculate_stats(ddem_2019, roi_mask, stable_mask)
+    mosaics = {}
+    for date, group in zip(validation_dates, groups_coreg):
+        print(date)
+        if len(group) > 0:
+            mosaics[date] = {}
+            dem_objs = [xdem.DEM(dem_path, load_data=False) for dem_path in group]
+            with warnings.catch_warnings():
+                warnings.filterwarnings("ignore")
+                mosaic = gu.spatial_tools.merge_rasters(
+                    dem_objs, reference=ref_dem, merge_algorithm=np.nanmedian, use_ref_bounds=True
+                )
+            ddem = ref_dem - mosaic
+            cov, _, med, nmad = pproc.calculate_stats(ddem, roi_mask, stable_mask)
+            mosaics[date]["dem"] = mosaic
+            mosaics[date]["ddem"] = ddem
+            mosaics[date]["cov"] = cov
+            mosaics[date]["med"] = med
+            mosaics[date]["nmad"] = nmad
 
     # -- Calculate elevation change for all periods -- #
-    if args.sat_type == "ASTER":
-        ddem_2000_2012 = mosaic_2012 - mosaic_2000
-    ddem_2012_2019 = mosaic_2019 - mosaic_2012
 
-    plt.figure(figsize=(18, 8))
-    ax1 = plt.subplot(121)
-    if args.sat_type == "ASTER":
-        roi_outlines.ds.plot(ax=ax1, facecolor="none", edgecolor="k", zorder=2)
-        ddem_2000_2012.show(ax=ax1, cmap="coolwarm_r", vmin=-50, vmax=50, cb_title="Elevation change (m)", zorder=1)
-        ax1.set_title("2000 - 2012")
+    print("\n### Calculate dDEMs for all subperiods ###")
+    ddems = {}
+    for k1 in range(len(validation_dates)):
+        for k2 in range(k1 + 1, len(validation_dates)):
+            date1 = validation_dates[k1]
+            date2 = validation_dates[k2]
+            if (date1 in mosaics.keys()) & (date2 in mosaics.keys()):
+                pair_id = f"{date1[:4]}_{date2[:4]}"  # year1_year2
+                print(pair_id)
+                ddems[pair_id] = mosaics[date2]["dem"] - mosaics[date1]["dem"]
 
-    ax2 = plt.subplot(122)
-    roi_outlines.ds.plot(ax=ax2, facecolor="none", edgecolor="k", zorder=2)
-    ddem_2012_2019.show(ax=ax2, cmap="coolwarm_r", vmin=-50, vmax=50, cb_title="Elevation change (m)", zorder=1)
-    ax2.set_title("2012 - 2019")
+    # -- Plot -- #
+
+    # Number of subplots needed and figsize
+    nsub = len(ddems)
+    figsize = (8 * nsub, 6)
+
+    plt.figure(figsize=figsize)
+
+    for k, pair_id in enumerate(ddems):
+
+        ax = plt.subplot(1, nsub, k + 1)
+        roi_outlines.ds.plot(ax=ax, facecolor="none", edgecolor="k", zorder=2)
+        ddems[pair_id].show(ax=ax, cmap="coolwarm_r", vmin=-50, vmax=50, cb_title="Elevation change (m)", zorder=1)
+        ax.set_title(pair_id)
 
     plt.tight_layout()
     plt.show()
 
-    # Calculating MB
-    if args.sat_type == "ASTER":
-        print("\n### Mass balance 2000 - 2012 ###")
+    # -_ Calculating MB -- #
+    print("\n### Calculating mass balance ###")
+    for k, pair_id in enumerate(ddems):
+
+        print(pair_id)
         ddem_bins, bins_area, frac_obs, dV, dh_mean = mb.mass_balance_local_hypso(
-            ddem_2000_2012, ref_dem, roi_mask, plot=True
+            ddems[pair_id], ref_dem, roi_mask, plot=True
         )
         print(f"Total volume: {dV:.1f} km3 - mean dh: {dh_mean:.2f} m")
-
-    print("\n### Mass balance 2012 - 2019 ###")
-    ddem_bins, bins_area, frac_obs, dV, dh_mean = mb.mass_balance_local_hypso(
-        ddem_2012_2019, ref_dem, roi_mask, plot=True
-    )
-    print(f"Total volume: {dV:.1f} km3 - mean dh: {dh_mean:.2f} m")
