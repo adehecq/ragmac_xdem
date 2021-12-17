@@ -25,7 +25,7 @@ pip uninstall geoutils xdem -y
 pip install git+https://github.com/GlacioHack/GeoUtils.git git+https://github.com/GlacioHack/xdem.git
 ```
 
-### Download data in ./data/raw folder
+### Download data in ./data/raw folder (~23 GB)
 `./scripts/download_data.sh`
 
 ## Process data for experiment 2 - WIP
