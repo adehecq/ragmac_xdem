@@ -155,7 +155,7 @@ if __name__ == "__main__":
     plt.tight_layout()
     plt.show()
 
-    # -_ Calculating MB -- #
+    # -- Calculating MB -- #
     print("\n### Calculating mass balance ###")
     for k, pair_id in enumerate(ddems):
 
