@@ -19,6 +19,10 @@ cd ragmac_xdem/
 conda env create -f environment.yml  # Optional, mostly xdem need to be installed
 conda activate ragmac_xdem           # Optional
 pip install -e .
+
+# To make sure the latest version is used
+pip uninstall geoutils xdem -y
+pip install git+https://github.com/GlacioHack/GeoUtils.git git+https://github.com/GlacioHack/xdem.git
 ```
 
 ### Download data in ./data/raw folder
