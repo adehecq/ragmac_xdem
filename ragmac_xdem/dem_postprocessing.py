@@ -21,7 +21,7 @@ import xdem
 
 from skimage.morphology import disk
 from tqdm import tqdm
-
+from ragmac_xdem import utils
 
 # Turn off imshow's interpolation to avoid gaps spread in plots
 plt.rcParams["image.interpolation"] = "none"
@@ -51,6 +51,126 @@ def calculate_stats(ddem, roi_mask, stable_mask):
     med_stable = np.nanmedian(data[stable_mask])
 
     return roi_coverage, nstable, med_stable, nmad_stable
+
+
+def calculate_init_stats_single(
+    dem_path: str,
+    ref_dem: xdem.DEM,
+    roi_outlines: gu.Vector,
+    all_outlines: gu.Vector,
+):
+    """
+    Calculate initial statistics of DEM in `dem_path` differenced with ref_dem.
+
+    Reads input DEM, reproject onto ref DEM grid, mask content of outlines, and calculate statistics.
+
+    :param dem_path: Path to the input DEM to be coregistered
+    :param ref_dem: the reference DEM
+    :param roi_outlines: The outlines of the glacier to study
+    :param all_outlines: The outlines of all glaciers in the study area
+
+    :returns: a tuple containing - basename of DEM, count of obs, median and NMAD over stable terrain, coverage over roi
+    """
+    # Load DEM and reproject to ref grid
+    dem = xdem.DEM(dem_path)
+    dem = dem.reproject(ref_dem, resampling="bilinear")
+
+    # Create masks
+    roi_mask = roi_outlines.create_mask(dem)
+    stable_mask = ~all_outlines.create_mask(dem)
+
+    # Calculate dDEM
+    ddem = dem - ref_dem
+
+    # Filter gross outliers in stable terrain
+    inlier_mask = nmad_filter(ddem.data, stable_mask, verbose=False)
+    outlier_mask = ~inlier_mask & stable_mask
+    ddem.data.mask[outlier_mask] = True
+    del inlier_mask
+
+    # Calculate coverage on and off ice
+    roi_coverage_orig, nstable_orig, med_orig, nmad_orig = calculate_stats(ddem, roi_mask, stable_mask)
+
+    # Calculate DEM date
+    dem_date = utils.get_dems_date([dem_path, ])
+
+    return (
+        os.path.basename(dem_path),
+        dem_date[0].isoformat(),
+        nstable_orig,
+        med_orig,
+        nmad_orig,
+        roi_coverage_orig,
+    )
+
+
+def calculate_init_stats_parallel(
+    dem_path_list,
+    ref_dem,
+    roi_outlines,
+    all_outlines,
+    outfile,
+    overwrite: bool = False,
+    nthreads: int = 1,
+):
+    """
+    Calculate DEM statistics of all files in dem_path_list by running calculate_init_stats_single in parallel
+    """
+    # List the filenames of the DEMs to be processed
+    if os.path.exists(outfile) & (not overwrite):
+        print(f"File {outfile} already exists -> nothing to be done")
+        df_stats = pd.read_csv(outfile)
+        return df_stats
+
+    global _stats_wrapper
+
+    def _stats_wrapper(dem_path):
+        """Calculate stats of a DEM in one thread."""
+        outputs = calculate_init_stats_single(dem_path, ref_dem, roi_outlines, all_outlines)
+        return outputs
+
+    # Arguments to be used for the progress bar
+    pbar_kwargs = {"total": len(dem_path_list), "desc": "Calculate initial stats of DEMs", "smoothing": 0}
+
+    # Run with either 1 or several threads
+    if nthreads == 1:
+        results = []
+        for dem_path in tqdm(dem_path_list, **pbar_kwargs):
+            output = _stats_wrapper(dem_path)
+            results.append(output)
+
+    elif nthreads > 1:
+
+        # Needed for MacOS with Python >= 3.8
+        # See https://stackoverflow.com/questions/60518386/error-with-module-multiprocessing-under-python3-8
+        cx = mp.get_context("fork")
+        with cx.Pool(nthreads) as pool:
+            results = list(tqdm(pool.imap(_stats_wrapper, dem_path_list, chunksize=1), **pbar_kwargs))
+            pool.close()
+            pool.join()
+
+    else:
+        raise ValueError("nthreads must be >= 1")
+
+    # -- Save stats to file -- #
+
+    # Convert output data to DataFrame
+    df_stats = pd.DataFrame(
+        results,
+        columns=[
+            "dem_path",
+            "dem_date",
+            "nstable_orig",
+            "med_orig",
+            "nmad_orig",
+            "roi_cover_orig",
+        ],
+    )
+
+    # Save output to file
+    df_stats.to_csv(outfile, index=False, float_format="%.2f")
+
+    return df_stats
 
 
 def nmad_filter(

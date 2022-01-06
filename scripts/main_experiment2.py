@@ -76,6 +76,12 @@ if __name__ == "__main__":
     if not os.path.exists(outdir):
         os.makedirs(outdir)
 
+    # -- Calculate initial DEM statistics -- #
+    print("\n### Calculate initial statistics ###")
+    stats_file = os.path.join(outdir, 'init_stats.csv')
+    init_stats = pproc.calculate_init_stats_parallel(dems_files, ref_dem, roi_outlines, all_outlines, stats_file, nthreads=args.nproc, overwrite=args.overwrite)
+    print(f"Statistics file saved to {stats_file}")
+
     # -- Select DEMs to be processed -- #
     print("\n### DEMs selection ###")
     validation_dates = baltoro_exp["validation_dates"]
