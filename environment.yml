@@ -9,5 +9,9 @@ dependencies:
   - pandas
   - xdem
   - opencv
+  - pip
   # dev requirements
   - pytest
+  - pip:
+    - "git+https://github.com/GlacioHack/GeoUtils.git"
+    - "git+https://github.com/GlacioHack/xdem.git" 
