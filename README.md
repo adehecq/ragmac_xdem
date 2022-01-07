@@ -31,10 +31,10 @@ or alternatively, you may use your own fork of geoutils/xdem if edits to these c
 ### Download data in ./data/raw folder (~23 GB)
 `./scripts/download_data.sh`
 
-## Process data for experiment 2 - WIP
+### Process data for experiment 2 - WIP
 `python ./scripts/main_experiment2.py`
 
-## Process data for experiment 1 - WIP
+### Process data for experiment 1 - WIP
 `python scripts/main_experiment1.py CH_Aletschgletscher`  
 `python scripts/main_experiment1.py AT_Hintereisferner`
 
