@@ -85,7 +85,8 @@ if __name__ == "__main__":
     # -- Select DEMs to be processed -- #
     print("\n### DEMs selection ###")
     validation_dates = exp["validation_dates"]
-    groups = utils.dems_selection(dems_files, validation_dates, dt=375)
+    selection_opts = {"dt":400, "months":[8,9,10]}
+    groups = utils.dems_selection(dems_files, validation_dates, **selection_opts)
     dems_files = [item for sublist in groups for item in sublist]
 
     for date, group in zip(validation_dates, groups):
@@ -105,7 +106,7 @@ if __name__ == "__main__":
         method="mp",
     )
     coreg_dems_files = np.asarray(stats["coreg_path"])
-    groups_coreg = utils.dems_selection(coreg_dems_files, validation_dates, dt=400)
+    groups_coreg = utils.dems_selection(coreg_dems_files, validation_dates, **selection_opts)
     print(f"--> Coregistered DEMs saved in {outdir}")
 
     # -- Merge DEMs by period -- #

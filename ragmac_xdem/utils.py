@@ -89,12 +89,21 @@ def select_dems_by_date(dem_path_list: list[str], date1: str, date2: str, sat_ty
     return np.where((date1 <= dates) & (dates <= date2))[0]
 
 
-def dems_selection(dem_path_list: list[str], validation_dates: list[str], dt: float = 365) -> list[list[str]]:
+def dems_selection(dem_path_list: list[str], validation_dates: list[str], dt: float = 365, months: list[int] = np.arange(12) + 1) -> list[list[str]]:
     """
     Return a list of lists of DEMs path that are within dt days of the validation dates.
+    Optionally, DEMs can be selected based on months of acquisition.
+
+    :param dem_path_list: List containing path to all DEMs to be considered
+    :param validation_dates: List of validation dates for the experiment, dates expressed as 'yyyy-mm-dd'
+    :param dt: Number of days allowed around each validation date
+    :param months: A list of months to be selected (numbered 1 to 12). Default is all months.
+
+    :returns: List of same length as validation dates, containing lists of DEM paths for each validation date.
     """
     # Get input DEM dates
     dems_dates = get_dems_date(dem_path_list)
+    dems_months = np.asarray([date.month for date in dems_dates])
 
     # Compare to each validation date
     output_list = []
@@ -102,7 +111,7 @@ def dems_selection(dem_path_list: list[str], validation_dates: list[str], dt: fl
         date = datetime.fromisoformat(date_str)
         date1 = date - timedelta(dt)
         date2 = date + timedelta(dt)
-        matching_dates = np.where((date1 <= dems_dates) & (dems_dates <= date2))[0]
+        matching_dates = np.where((date1 <= dems_dates) & (dems_dates <= date2) & np.isin(dems_months, months))[0]
         output_list.append(dem_path_list[matching_dates])
 
     return output_list
