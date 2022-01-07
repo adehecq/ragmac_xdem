@@ -13,5 +13,5 @@ dependencies:
   # dev requirements
   - pytest
   - pip:
-    - "git+https://github.com/GlacioHack/GeoUtils.git"
-    - "git+https://github.com/GlacioHack/xdem.git" 
+    - -e "git+https://github.com/GlacioHack/GeoUtils.git@main#egg=geoutils"
+    - -e "git+https://github.com/GlacioHack/xdem.git@main#egg=xdem"
