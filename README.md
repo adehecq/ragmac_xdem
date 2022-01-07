@@ -34,6 +34,10 @@ or alternatively, you may use your own fork of geoutils/xdem if edits to these c
 ## Process data for experiment 2 - WIP
 `python ./scripts/main_experiment2.py`
 
+## Process data for experiment 1 - WIP
+`python scripts/main_experiment1.py CH_Aletschgletscher`  
+`python scripts/main_experiment1.py AT_Hintereisferner`
+
 --------
 
 <p><small>Project based on the <a target="_blank" href="https://github.com/jbusecke/cookiecutter-science-project">cookiecutter science project template</a>.</small></p>
