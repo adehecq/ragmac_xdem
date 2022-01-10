@@ -102,6 +102,40 @@ def mad(a, axis=None, c=1.4826, return_med=False):
         out = (out, med)
     return out
 
+def do_robust_linreg(arg):
+    date_list_o, y, model = arg
+    y_idx = ~(np.ma.getmaskarray(y))
+    #newaxis is necessary b/c ransac expects 2D input array
+    x = date_list_o[y_idx].data[:,np.newaxis]
+    y = y[y_idx].data
+    return robust_linreg(x, y, model)
+
+def robust_linreg(x, y, model='theilsen'):
+    from sklearn import linear_model
+    slope = None
+    intercept = None
+    if model == 'linear':
+        m = linear_model.LinearRegression()
+        m.fit(x, y)
+        slope = m.coef_
+        intercept = m.intercept_
+    elif model == 'ransac':
+        m = linear_model.RANSACRegressor()
+        m.fit(x, y)
+        slope = m.estimator_.coef_
+        intercept = m.estimator_.intercept_
+        #inlier_mask = ransac.inlier_mask_
+        #outlier_mask = np.logical_not(inlier_mask)
+    elif model == 'theilsen':
+        m = linear_model.TheilSenRegressor()
+        m.fit(x, y)
+        slope = m.coef_
+        intercept = m.intercept_
+    #xi = np.arange(x.min(), x.max())[:,np.newaxis]
+    #yi = model.predict(xi) 
+    #ax.plot(xi, yi)
+    return(slope[0], intercept)
+
 def ma_linreg(ma_stack, dt_list, n_thresh=2, model='linear', dt_stack_ptp=None, min_dt_ptp=None, smooth=False, \
         rsq=False, conf_test=False, parallel=True, n_cpu=None, remove_outliers=False):
     """Compute per-pixel linear regression for stack object
@@ -154,6 +188,7 @@ def ma_linreg(ma_stack, dt_list, n_thresh=2, model='linear', dt_stack_ptp=None, 
         max_n = 3
         n = 1
         while(y_orig.count() < valid_sample_count and n <= max_n):
+            print(n)
             valid_pixel_count = np.sum(valid_mask_2D)
             valid_sample_count = y_orig.count()
             print("%i valid pixels with up to %i timestamps: %i total valid samples" % \
@@ -165,11 +200,12 @@ def ma_linreg(ma_stack, dt_list, n_thresh=2, model='linear', dt_stack_ptp=None, 
                 if parallel:
                     import multiprocessing as mp
                     if n_cpu is None:
-                        n_cpu = iolib.cpu_count(logical=True)
+                        n_cpu = psutil.cpu_count(logical=True)
                     n_cpu = int(n_cpu)
                     print("Running in parallel with %i processes" % n_cpu)
                     pool = mp.Pool(processes=n_cpu)
                     results = pool.map(do_robust_linreg, [(date_list_o, y_orig[:,n], model) for n in range(y_orig.shape[1])])
+
                     results = np.array(results)
                     m = results[:,0]
                     b = results[:,1]
@@ -177,7 +213,7 @@ def ma_linreg(ma_stack, dt_list, n_thresh=2, model='linear', dt_stack_ptp=None, 
                     for n in range(y_orig.shape[1]):
                         print('%i of %i px' % (n, y_orig.shape[1]))
                         y = y_orig[:,n]
-                        m[n], b[n] = do_robust_linreg(date_list_o, y, model)
+                        m[n], b[n] = do_robust_linreg([date_list_o, y, model])
             else:
                 #if model == 'linear':
                 #Remove masks, fills with fill_value
