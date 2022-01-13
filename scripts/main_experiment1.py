@@ -71,12 +71,9 @@ if __name__ == "__main__":
     # -- Select DEMs to be processed -- #
     print("\n### DEMs selection ###")
     validation_dates = exp["validation_dates"]
-    selection_opts = {"dt":400, "months":[8,9,10]}
-    groups = utils.dems_selection(dems_files, validation_dates, **selection_opts)
+    selection_opts = {"mode": "temporal", "dt": 400, "months": [8, 9, 10]}
+    groups = utils.dems_selection(dems_files, validation_dates=validation_dates, **selection_opts)
     dems_files = [item for sublist in groups for item in sublist]
-
-    for date, group in zip(validation_dates, groups):
-        print(f"For date {date} found {len(group)} DEMs")
 
     # -- Postprocess DEMs i.e. coregister, filter etc -- #
     print("\n### Coregister DEMs ###")

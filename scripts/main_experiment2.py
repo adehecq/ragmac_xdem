@@ -46,7 +46,7 @@ if __name__ == "__main__":
     # -- Load input data -- #
     baltoro_paths = files.get_data_paths("PK_Baltoro")
     ref_dem, all_outlines, roi_outlines, roi_mask, stable_mask = utils.load_ref_and_masks(baltoro_paths)
-
+    
     # Get list of all DEMs and set output directory
     if args.sat_type == "ASTER":
         dems_files = baltoro_paths["raw_data"]["aster_dems"]
@@ -70,12 +70,10 @@ if __name__ == "__main__":
 
     # -- Select DEMs to be processed -- #
     print("\n### DEMs selection ###")
+    selection_opts = {"mode": "temporal", "dt": 365, "months": [8, 9, 10]}
     validation_dates = baltoro_paths["validation_dates"]
-    groups = utils.dems_selection(dems_files, validation_dates, dt=365)
+    groups = utils.dems_selection(dems_files, validation_dates=validation_dates, **selection_opts)
     dems_files = [item for sublist in groups for item in sublist]
-
-    for date, group in zip(validation_dates, groups):
-        print(f"For date {date} found {len(group)} DEMs")
 
     # -- Postprocess DEMs i.e. coregister, filter etc -- #
     print("\n### Coregister DEMs ###")
