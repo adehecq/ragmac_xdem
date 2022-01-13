@@ -51,19 +51,7 @@ if __name__ == "__main__":
 
     # -- Load input data -- #
     exp = files.get_data_paths(args.region)
-
-    # Load reference DEM
-    ref_dem = xdem.DEM(exp["raw_data"]["ref_dem_path"])
-
-    # Load all outlines
-    all_outlines = gu.geovector.Vector(exp["raw_data"]["rgi_path"])
-
-    # Load selected glacier outline
-    roi_outlines = gu.geovector.Vector(exp["raw_data"]["selected_path"])
-
-    # Create masks
-    roi_mask = roi_outlines.create_mask(ref_dem)
-    stable_mask = ~all_outlines.create_mask(ref_dem)
+    ref_dem, all_outlines, roi_outlines, roi_mask, stable_mask = utils.load_ref_and_masks(exp)
 
     # Get list of all DEMs and set output directory
     if args.sat_type == "ASTER":

@@ -44,29 +44,17 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # -- Load input data -- #
-    baltoro_exp = files.get_data_paths("PK_Baltoro")
-
-    # Load reference DEM
-    ref_dem = xdem.DEM(baltoro_exp["raw_data"]["ref_dem_path"])
-
-    # Load all outlines
-    all_outlines = gu.geovector.Vector(baltoro_exp["raw_data"]["rgi_path"])
-
-    # Load selected glacier outline
-    roi_outlines = gu.geovector.Vector(baltoro_exp["raw_data"]["selected_path"])
-
-    # Create masks
-    roi_mask = roi_outlines.create_mask(ref_dem)
-    stable_mask = ~all_outlines.create_mask(ref_dem)
+    baltoro_paths = files.get_data_paths("PK_Baltoro")
+    ref_dem, all_outlines, roi_outlines, roi_mask, stable_mask = utils.load_ref_and_masks(baltoro_paths)
 
     # Get list of all DEMs and set output directory
     if args.sat_type == "ASTER":
-        dems_files = baltoro_exp["raw_data"]["aster_dems"]
-        outdir = baltoro_exp["processed_data"]["aster_dir"]
+        dems_files = baltoro_paths["raw_data"]["aster_dems"]
+        outdir = baltoro_paths["processed_data"]["aster_dir"]
 
     elif args.sat_type == "TDX":
-        dems_files = baltoro_exp["raw_data"]["tdx_dems"]
-        outdir = baltoro_exp["processed_data"]["tdx_dir"]
+        dems_files = baltoro_paths["raw_data"]["tdx_dems"]
+        outdir = baltoro_paths["processed_data"]["tdx_dir"]
     else:
         raise NotImplementedError
 
@@ -82,7 +70,7 @@ if __name__ == "__main__":
 
     # -- Select DEMs to be processed -- #
     print("\n### DEMs selection ###")
-    validation_dates = baltoro_exp["validation_dates"]
+    validation_dates = baltoro_paths["validation_dates"]
     groups = utils.dems_selection(dems_files, validation_dates, dt=365)
     dems_files = [item for sublist in groups for item in sublist]
 

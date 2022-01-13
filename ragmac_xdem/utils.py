@@ -7,7 +7,9 @@ import re
 
 from datetime import datetime, timedelta
 
+import geoutils as gu
 import numpy as np
+import xdem
 
 
 def get_aster_date(fname) -> datetime:
@@ -115,3 +117,26 @@ def dems_selection(dem_path_list: list[str], validation_dates: list[str], dt: fl
         output_list.append(dem_path_list[matching_dates])
 
     return output_list
+
+
+def load_ref_and_masks(case_paths: dict) -> list:
+    """
+    Loads the reference xdem, outlines and masks of ROI and stable terrin, from the dictionary provided by files.get_data_paths.
+
+    :returns:
+    - ref_dem (xdem.DEM object), all_outlines (gu.Vector object), roi_outlines (gu.Vector object), roi_mask (np.ndarray, stable_mask (np.ndarray)
+    """
+    # Load reference DEM
+    ref_dem = xdem.DEM(case_paths["raw_data"]["ref_dem_path"])
+
+    # Load all outlines
+    all_outlines = gu.geovector.Vector(case_paths["raw_data"]["rgi_path"])
+
+    # Load selected glacier outline
+    roi_outlines = gu.geovector.Vector(case_paths["raw_data"]["selected_path"])
+
+    # Create masks
+    roi_mask = roi_outlines.create_mask(ref_dem)
+    stable_mask = ~all_outlines.create_mask(ref_dem)
+
+    return ref_dem, all_outlines, roi_outlines, roi_mask, stable_mask
