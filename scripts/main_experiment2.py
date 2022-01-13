@@ -89,7 +89,7 @@ if __name__ == "__main__":
         method="mp",
     )
     coreg_dems_files = np.asarray(stats["coreg_path"])
-    groups_coreg = utils.dems_selection(coreg_dems_files, validation_dates, dt=365)
+    groups_coreg = utils.dems_selection(coreg_dems_files, validation_dates=validation_dates, **selection_opts)
     print(f"--> Coregistered DEMs saved in {outdir}")
 
     # -- Merge DEMs by period -- #
