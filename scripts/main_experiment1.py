@@ -15,7 +15,7 @@ import xdem
 import ragmac_xdem.dem_postprocessing as pproc
 
 from ragmac_xdem import mass_balance as mb
-from ragmac_xdem import utils
+from ragmac_xdem import utils, files
 
 
 if __name__ == "__main__":
@@ -50,9 +50,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # -- Load input data -- #
-    from ragmac_xdem import files
-
-    exp = files.experiments["experiment_1"][args.region]
+    exp = files.get_data_paths(args.region)
 
     # Load reference DEM
     ref_dem = xdem.DEM(exp["raw_data"]["ref_dem_path"])
