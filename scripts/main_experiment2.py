@@ -1,3 +1,5 @@
+#! /usr/bin/env python
+
 """
 The main script to be run for experiment_2
 """
@@ -159,7 +161,9 @@ if __name__ == "__main__":
         ax.set_title(pair_id)
 
     plt.tight_layout()
-    plt.show()
+    fig_fn = 'ddem_fig.png'
+    plt.savefig(fig_fn)
+    #plt.show()
 
     # -- Calculating MB -- #
     print("\n### Calculating mass balance ###")
@@ -167,6 +171,6 @@ if __name__ == "__main__":
 
         print(pair_id)
         ddem_bins, bins_area, frac_obs, dV, dh_mean = mb.mass_balance_local_hypso(
-            ddems[pair_id], ref_dem, roi_mask, plot=True
+            ddems[pair_id], ref_dem, roi_mask, plot=True, outfig='mb_fig.png'
         )
         print(f"Total volume: {dV:.1f} km3 - mean dh: {dh_mean:.2f} m")
