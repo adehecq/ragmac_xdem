@@ -15,7 +15,7 @@ import xdem
 import ragmac_xdem.dem_postprocessing as pproc
 
 from ragmac_xdem import mass_balance as mb
-from ragmac_xdem import utils
+from ragmac_xdem import utils, files
 
 
 if __name__ == "__main__":
@@ -44,31 +44,17 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # -- Load input data -- #
-    from ragmac_xdem import files
-
-    baltoro_exp = files.experiments["experiment_2"]["PK_Baltoro"]
-
-    # Load reference DEM
-    ref_dem = xdem.DEM(baltoro_exp["raw_data"]["ref_dem_path"])
-
-    # Load all outlines
-    all_outlines = gu.geovector.Vector(baltoro_exp["raw_data"]["rgi_path"])
-
-    # Load selected glacier outline
-    roi_outlines = gu.geovector.Vector(baltoro_exp["raw_data"]["selected_path"])
-
-    # Create masks
-    roi_mask = roi_outlines.create_mask(ref_dem)
-    stable_mask = ~all_outlines.create_mask(ref_dem)
-
+    baltoro_paths = files.get_data_paths("PK_Baltoro")
+    ref_dem, all_outlines, roi_outlines, roi_mask, stable_mask = utils.load_ref_and_masks(baltoro_paths)
+    
     # Get list of all DEMs and set output directory
     if args.sat_type == "ASTER":
-        dems_files = baltoro_exp["raw_data"]["aster_dems"]
-        outdir = baltoro_exp["processed_data"]["aster_dir"]
+        dems_files = baltoro_paths["raw_data"]["aster_dems"]
+        outdir = baltoro_paths["processed_data"]["aster_dir"]
 
     elif args.sat_type == "TDX":
-        dems_files = baltoro_exp["raw_data"]["tdx_dems"]
-        outdir = baltoro_exp["processed_data"]["tdx_dir"]
+        dems_files = baltoro_paths["raw_data"]["tdx_dems"]
+        outdir = baltoro_paths["processed_data"]["tdx_dir"]
     else:
         raise NotImplementedError
 
@@ -84,12 +70,10 @@ if __name__ == "__main__":
 
     # -- Select DEMs to be processed -- #
     print("\n### DEMs selection ###")
-    validation_dates = baltoro_exp["validation_dates"]
-    groups = utils.dems_selection(dems_files, validation_dates, dt=365)
+    selection_opts = {"mode": "temporal", "dt": 365, "months": [8, 9, 10]}
+    validation_dates = baltoro_paths["validation_dates"]
+    groups = utils.dems_selection(dems_files, validation_dates=validation_dates, **selection_opts)
     dems_files = [item for sublist in groups for item in sublist]
-
-    for date, group in zip(validation_dates, groups):
-        print(f"For date {date} found {len(group)} DEMs")
 
     # -- Postprocess DEMs i.e. coregister, filter etc -- #
     print("\n### Coregister DEMs ###")
@@ -105,7 +89,7 @@ if __name__ == "__main__":
         method="mp",
     )
     coreg_dems_files = np.asarray(stats["coreg_path"])
-    groups_coreg = utils.dems_selection(coreg_dems_files, validation_dates, dt=365)
+    groups_coreg = utils.dems_selection(coreg_dems_files, validation_dates=validation_dates, **selection_opts)
     print(f"--> Coregistered DEMs saved in {outdir}")
 
     # -- Merge DEMs by period -- #

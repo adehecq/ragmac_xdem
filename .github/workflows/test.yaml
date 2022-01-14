@@ -17,7 +17,7 @@ jobs:
       fail-fast: false
       matrix:
         os: ["ubuntu-latest"]
-        python-version: ["3.7", "3.8"]
+        python-version: ["3.9"]
     steps:
       - uses: actions/checkout@v2
       - name: Cache conda
@@ -33,7 +33,7 @@ jobs:
           # mamba-version: "*" # activate this to build with mamba.
           # channels: conda-forge, defaults # These need to be specified to use mamba
           # channel-priority: true
-          environment-file: ci/environment-py${{ matrix.python-version }}.yml
+          environment-file: environment.yml
 
           activate-environment: test_env_ragmac_xdem
           use-only-tar-bz2: true # IMPORTANT: This needs to be set for caching to work properly!
@@ -44,7 +44,7 @@ jobs:
       - name: Run Tests
         shell: bash -l {0}
         run: |
-          pytest --cov=./ --cov-report=xml
+          pytest -ra
       - name: Upload code coverage to Codecov
         uses: codecov/codecov-action@v2.1.0
         with:

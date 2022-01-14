@@ -15,7 +15,7 @@ import xdem
 import ragmac_xdem.dem_postprocessing as pproc
 
 from ragmac_xdem import mass_balance as mb
-from ragmac_xdem import utils
+from ragmac_xdem import utils, files
 
 
 if __name__ == "__main__":
@@ -50,22 +50,8 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # -- Load input data -- #
-    from ragmac_xdem import files
-
-    exp = files.experiments["experiment_1"][args.region]
-
-    # Load reference DEM
-    ref_dem = xdem.DEM(exp["raw_data"]["ref_dem_path"])
-
-    # Load all outlines
-    all_outlines = gu.geovector.Vector(exp["raw_data"]["rgi_path"])
-
-    # Load selected glacier outline
-    roi_outlines = gu.geovector.Vector(exp["raw_data"]["selected_path"])
-
-    # Create masks
-    roi_mask = roi_outlines.create_mask(ref_dem)
-    stable_mask = ~all_outlines.create_mask(ref_dem)
+    exp = files.get_data_paths(args.region)
+    ref_dem, all_outlines, roi_outlines, roi_mask, stable_mask = utils.load_ref_and_masks(exp)
 
     # Get list of all DEMs and set output directory
     if args.sat_type == "ASTER":
@@ -85,12 +71,9 @@ if __name__ == "__main__":
     # -- Select DEMs to be processed -- #
     print("\n### DEMs selection ###")
     validation_dates = exp["validation_dates"]
-    selection_opts = {"dt":400, "months":[8,9,10]}
-    groups = utils.dems_selection(dems_files, validation_dates, **selection_opts)
+    selection_opts = {"mode": "temporal", "dt": 400, "months": [8, 9, 10]}
+    groups = utils.dems_selection(dems_files, validation_dates=validation_dates, **selection_opts)
     dems_files = [item for sublist in groups for item in sublist]
-
-    for date, group in zip(validation_dates, groups):
-        print(f"For date {date} found {len(group)} DEMs")
 
     # -- Postprocess DEMs i.e. coregister, filter etc -- #
     print("\n### Coregister DEMs ###")
@@ -106,7 +89,7 @@ if __name__ == "__main__":
         method="mp",
     )
     coreg_dems_files = np.asarray(stats["coreg_path"])
-    groups_coreg = utils.dems_selection(coreg_dems_files, validation_dates, **selection_opts)
+    groups_coreg = utils.dems_selection(coreg_dems_files, validation_dates=validation_dates, **selection_opts)
     print(f"--> Coregistered DEMs saved in {outdir}")
 
     # -- Merge DEMs by period -- #
