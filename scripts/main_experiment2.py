@@ -145,7 +145,7 @@ if __name__ == "__main__":
         ax.set_title(pair_id)
 
     plt.tight_layout()
-    fig_fn = 'ddem_fig.png'
+    fig_fn = os.path.join(outdir, 'ddem_fig.png')
     plt.savefig(fig_fn)
     #plt.show()
 
@@ -154,7 +154,8 @@ if __name__ == "__main__":
     for k, pair_id in enumerate(ddems):
 
         print(pair_id)
+        fig_fn = os.path.join(outdir, f'{pair_id}_mb_fig.png')
         ddem_bins, bins_area, frac_obs, dV, dh_mean = mb.mass_balance_local_hypso(
-            ddems[pair_id], ref_dem, roi_mask, plot=True, outfig='mb_fig.png'
+            ddems[pair_id], ref_dem, roi_mask, plot=True, outfig=fig_fn
         )
         print(f"Total volume: {dV:.1f} km3 - mean dh: {dh_mean:.2f} m")
