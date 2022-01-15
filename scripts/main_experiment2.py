@@ -74,7 +74,8 @@ if __name__ == "__main__":
     print("\n### DEMs selection ###")
     selection_opts = {"mode": "temporal", "dt": 365, "months": [8, 9, 10]}
     validation_dates = baltoro_paths["validation_dates"]
-    groups = utils.dems_selection(dems_files, validation_dates=validation_dates, **selection_opts)
+    #groups = utils.dems_selection(dems_files, validation_dates=validation_dates, **selection_opts)
+    groups = utils.dems_selection(dems_files, mode=None)
     dems_files = [item for sublist in groups for item in sublist]
 
     # -- Postprocess DEMs i.e. coregister, filter etc -- #
