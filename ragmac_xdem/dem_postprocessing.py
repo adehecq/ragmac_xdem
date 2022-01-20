@@ -408,6 +408,9 @@ def postprocessing_all(
 ):
     """
     Run the postprocessing for all DEMs in dem_path_list.
+    dem_path_list can be either a list of paths, or a list of list of paths (to allow grouping files).
+
+    Return: pd.Series containing output stats, list of output files paths (same shape as dem_path_list)
     """
     # Check that chosen method is correct
     if not method in ["mp", "concurrent"]:
@@ -421,7 +424,19 @@ def postprocessing_all(
     if not overwrite:
         existing = glob(outdir + "/*_coreg.tif")
         existing = [os.path.basename(fp).replace("_coreg", "") for fp in existing]
-        dem_path_list = [fp for fp in dem_path_list if os.path.basename(fp) not in existing]
+    else:
+        existing = []
+
+    # If inputs is a list of list
+    if isinstance(dem_path_list[0], (list, tuple, np.ndarray)):
+        dem_to_process = [fp for group in dem_path_list for fp in group if os.path.basename(fp) not in existing]
+    # If inputs is a list of strings
+    elif isinstance(dem_path_list[0], str):
+        dem_to_process = [fp for fp in dem_path_list if os.path.basename(fp) not in existing]
+    else:
+        raise ValueError(
+            "Input `dem_path_list` not understood, must be a list of strings, or list of list of strings"
+        )
 
     # Needed to avoid errors when plotting on MacOS
     old_backend = mpl.get_backend()
@@ -440,12 +455,12 @@ def postprocessing_all(
         return outputs
 
     # Arguments to be used for the progress bar
-    pbar_kwargs = {"total": len(dem_path_list), "desc": "Postprocessing DEMs", "smoothing": 0}
+    pbar_kwargs = {"total": len(dem_to_process), "desc": "Postprocessing DEMs", "smoothing": 0}
 
     # Run with either 1 or several threads
     if nthreads == 1:
         results = []
-        for dem_path in tqdm(dem_path_list, **pbar_kwargs):
+        for dem_path in tqdm(dem_to_process, **pbar_kwargs):
             output = _postproc_wrapper(dem_path)
             results.append(output)
 
@@ -456,13 +471,13 @@ def postprocessing_all(
             # See https://stackoverflow.com/questions/60518386/error-with-module-multiprocessing-under-python3-8
             cx = mp.get_context("fork")
             with cx.Pool(nthreads) as pool:
-                results = list(tqdm(pool.imap(_postproc_wrapper, dem_path_list, chunksize=1), **pbar_kwargs))
+                results = list(tqdm(pool.imap(_postproc_wrapper, dem_to_process, chunksize=1), **pbar_kwargs))
                 pool.close()
                 pool.join()
 
         elif method == "concurrent":
             with concurrent.futures.ThreadPoolExecutor(max_workers=nthreads) as executor:
-                results = list(tqdm(executor.map(_postproc_wrapper, dem_path_list), **pbar_kwargs))
+                results = list(tqdm(executor.map(_postproc_wrapper, dem_to_process), **pbar_kwargs))
 
     else:
         raise ValueError("nthreads must be >= 1")
@@ -504,4 +519,14 @@ def postprocessing_all(
     # Save concatenated output to file
     out_df.to_csv(stats_file, index=False, float_format="%.2f")
 
-    return out_df
+    # Get DEM Ids of files to be returned
+    out_paths = []
+    if isinstance(dem_path_list[0], (list, tuple, np.ndarray)):
+        for group in dem_path_list:
+            dem_IDs = np.asarray([os.path.basename(dem_path) for dem_path in group])
+            out_paths.append(out_df[out_df["ID"].isin(dem_IDs)]['coreg_path'].values)
+    elif isinstance(dem_path_list[0], str):
+        dem_IDs = np.asarray([os.path.basename(dem_path) for dem_path in dem_path_list])
+        out_paths.extend(out_df[out_df["ID"].isin(dem_IDs)]['coreg_path'].values)
+
+    return out_df, out_paths
