@@ -10,6 +10,7 @@ from datetime import datetime, timedelta
 import geoutils as gu
 import numpy as np
 import xdem
+import pandas as pd
 
 
 def get_satellite_type(dem_path):
@@ -96,31 +97,56 @@ def select_dems_by_date(dem_path_list: list[str], date1: str, date2: str, sat_ty
     return np.where((date1 <= dates) & (dates <= date2))[0]
 
 
+def best_dem_cover(dem_path_list: list, init_stats: pd.Series) -> list[str, float]:
+    """
+    From a list of DEMs, returns the one with the best ROI coverage.
+
+    :params dem_path_list: list of DEMs path to be considered
+    :params init_stats: a pd.Series containing the statistics of all DEMs as returned by dem_postprocessing.calculate_init_stats_parallel.
+
+    :returns: path to the best DEM, ROI coverage
+    """
+    # Get basename to DEM paths
+    dem_IDs = np.asarray([os.path.basename(dem_path) for dem_path in dem_path_list])
+
+    # Extract stats for selected DEMs
+    stats_subset = init_stats.loc[np.isin(init_stats["dem_path"], dem_IDs)]
+
+    # Select highest ROI coverage
+    best = stats_subset.sort_values(by='roi_cover_orig').iloc[-1]
+
+    return best.dem_path, best.roi_cover_orig
+
+
 def dems_selection(
         dem_path_list: list[str],
         mode: str = None,
         validation_dates: list[str] = None,
         dt: float = -1,
-        months: list[int] = np.arange(12) + 1
+        months: list[int] = np.arange(12) + 1,
+        init_stats: pd.Series = None,
 ) -> list[list[str]]:
     """
     Return a list of lists of DEMs path that fit the selection.
-    Selection mode include None or 'temporal'. If None, return all DEMs. If 'temporal' is set, 
- `dt`, 'validation_dates` and optionally `months` must be set.
+
+    Selection mode include None, 'temporal' or 'best'.
+    If None, return all DEMs.
+    If 'temporal' is set, `dt`, 'validation_dates` and optionally `months` must be set. Returns all DEMs within the time window.
+    If 'best' is set, 'init_stats' must be provided. Select DEMs based on the temporal selection, but only returns a single DEM with the highest ROI coverage.
 
     :param dem_path_list: List containing path to all DEMs to be considered
     :param mode" Any of None or "temporal"
     :param validation_dates: List of validation dates for the experiment, dates expressed as 'yyyy-mm-dd'
     :param dt: Number of days allowed around each validation date
     :param months: A list of months to be selected (numbered 1 to 12). Default is all months.
-
+    :params init_stats: a pd.Series containing the statistics of all DEMs as returned by dem_postprocessing.calculate_init_stats_parallel.
     :returns: List of same length as validation dates, containing lists of DEM paths for each validation date.
     """
     if mode is None:
         print(f"Found {len(dem_path_list)} DEMs")
         return [dem_path_list]
 
-    elif mode == "temporal":
+    elif mode == "temporal" or mode == "best":
         # check that optional arguments are set
         assert validation_dates is not None, "`validation_dates` must be set"
         assert dt >= 0, "dt must be set to >= 0 value"
@@ -138,10 +164,17 @@ def dems_selection(
             matching_dates = np.where((date1 <= dems_dates) & (dems_dates <= date2) & np.isin(dems_months, months))[0]
             output_list.append(dem_path_list[matching_dates])
 
-        for date, group in zip(validation_dates, output_list):
-            print(f"For date {date} found {len(group)} DEMs")
-
-        return output_list
+        if mode == "temporal":
+            for date, group in zip(validation_dates, output_list):
+                print(f"For date {date} found {len(group)} DEMs")
+            return output_list
+        else:
+            assert init_stats is not None, "`init_stats` must be provided for mode 'best'"
+            final_dem_list = []
+            for group in output_list:
+                selected_dem, _ = best_dem_cover(group, init_stats)
+                final_dem_list.append([selected_dem, ])
+            return final_dem_list
     else:
         raise ValueError(f"Mode {mode} not recognized")
 
