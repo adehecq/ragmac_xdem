@@ -106,11 +106,8 @@ def best_dem_cover(dem_path_list: list, init_stats: pd.Series) -> list[str, floa
 
     :returns: path to the best DEM, ROI coverage
     """
-    # Get basename to DEM paths
-    dem_IDs = np.asarray([os.path.basename(dem_path) for dem_path in dem_path_list])
-
     # Extract stats for selected DEMs
-    stats_subset = init_stats.loc[np.isin(init_stats["dem_path"], dem_IDs)]
+    stats_subset = init_stats.loc[np.isin(init_stats["dem_path"], dem_path_list)]
 
     # Select highest ROI coverage
     best = stats_subset.sort_values(by='roi_cover_orig').iloc[-1]

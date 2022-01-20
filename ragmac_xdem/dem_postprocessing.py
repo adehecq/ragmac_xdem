@@ -69,7 +69,7 @@ def calculate_init_stats_single(
     :param roi_outlines: The outlines of the glacier to study
     :param all_outlines: The outlines of all glaciers in the study area
 
-    :returns: a tuple containing - basename of DEM, count of obs, median and NMAD over stable terrain, coverage over roi
+    :returns: a tuple containing - basename of DEM, path to DEM, count of obs, median and NMAD over stable terrain, coverage over roi
     """
     # Load DEM and reproject to ref grid
     dem = xdem.DEM(dem_path)
@@ -96,6 +96,7 @@ def calculate_init_stats_single(
 
     return (
         os.path.basename(dem_path),
+        dem_path,
         dem_date[0].isoformat(),
         nstable_orig,
         med_orig,
@@ -158,6 +159,7 @@ def calculate_init_stats_parallel(
     df_stats = pd.DataFrame(
         results,
         columns=[
+            "ID",
             "dem_path",
             "dem_date",
             "nstable_orig",
