@@ -75,12 +75,11 @@ if __name__ == "__main__":
     selection_opts = {"mode": "temporal", "dt": 365, "months": [8, 9, 10]}
     validation_dates = baltoro_paths["validation_dates"]
     groups = utils.dems_selection(dems_files, validation_dates=validation_dates, **selection_opts)
-    dems_files = [item for sublist in groups for item in sublist]
 
     # -- Postprocess DEMs i.e. coregister, filter etc -- #
     print("\n### Coregister DEMs ###")
-    stats = pproc.postprocessing_all(
-        dems_files,
+    stats, groups_coreg = pproc.postprocessing_all(
+        groups,
         ref_dem,
         roi_outlines,
         all_outlines,
@@ -90,8 +89,6 @@ if __name__ == "__main__":
         plot=True,
         method="mp",
     )
-    coreg_dems_files = np.asarray(stats["coreg_path"])
-    groups_coreg = utils.dems_selection(coreg_dems_files, validation_dates=validation_dates, **selection_opts)
     print(f"--> Coregistered DEMs saved in {outdir}")
 
     # -- Merge DEMs by period -- #
