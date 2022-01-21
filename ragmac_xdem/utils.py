@@ -70,9 +70,10 @@ def date_time_to_decyear(date_time: float, leapyear=True) -> float:
 
 def fannys_convert_date_time_to_decimal_date(date_time):
     """
-    Function used by Fanny Brun for decimal year conversion. This has a mistake, as it introduces a ~1 day shift.
+    WARNING: this function is flawed, see https://github.com/adehecq/ragmac_xdem/pull/18.
+    Function used by Fanny Brun for decimal year conversion, from ragmac_xdem/data/raw/convert_dates.py.
     Used only for checking that we're transforming the date back correctly.
-
+    ----
     This function converts a date and a time to a decimal date value
     Inputs:
     - date_time: datetime object
