@@ -4,13 +4,12 @@ from __future__ import annotations
 
 import os
 import re
-
 from datetime import datetime, timedelta
 
 import geoutils as gu
 import numpy as np
-import xdem
 import pandas as pd
+import xdem
 
 
 def get_satellite_type(dem_path):
@@ -25,20 +24,78 @@ def get_satellite_type(dem_path):
     return sat_type
 
 
-def get_aster_date(fname) -> datetime:
-    """Parse the date of an ASTER DEM from the filename"""
-    # Extract string containing decimal year
-    basename = os.path.basename(fname)
-    year_decimal = float(basename[4:17])
-
+def decyear_to_date_time(decyear: float, leapyear=True, fannys_corr=False) -> datetime.datetime:
+    """
+    Convert a decimal year to a datetime object.
+    If leapyear set to True, use the actual number of days in the year, otherwise, use the average value of 365.25.
+    """
     # Get integer year and decimals
-    year = int(np.trunc(year_decimal))
-    decimals = year_decimal - year
+    year = int(np.trunc(decyear))
+    decimals = decyear - year
 
     # Convert to date and time
     base = datetime(year, 1, 1)
     ndays = base.replace(year=base.year + 1) - base
-    return base + timedelta(seconds=ndays.total_seconds() * decimals)
+
+    # Calculate final date, taking into account leap years or average 365.25 days
+    if leapyear:
+        date_time = base + timedelta(seconds=ndays.total_seconds() * decimals)
+    else:
+        date_time = base + timedelta(seconds=365.25 * 24 * 3600 * decimals)
+
+    # Apply a correction to correctly reverse Fanny's decyear which have ~1 day shift
+    if fannys_corr:
+        date_time -= timedelta(seconds=86399.975157)
+
+    return date_time
+
+
+def date_time_to_decyear(date_time: float, leapyear=True) -> float:
+    """
+    Convert a datetime object to a decimal year.
+    If leapyear set to True, use the actual number of days in the year, otherwise, use the average value of 365.25.
+    """
+    base = datetime(date_time.year, 1, 1)
+    ddate = date_time - base
+
+    if leapyear:
+        ndays = (datetime(date_time.year + 1, 1, 1) - base).days
+    else:
+        ndays = 365.25
+
+    decyear = date_time.year + ddate.total_seconds() / (ndays * 24 * 3600)
+
+    return decyear
+
+
+def fannys_convert_date_time_to_decimal_date(date_time):
+    """
+    WARNING: this function is flawed, see https://github.com/adehecq/ragmac_xdem/pull/18.
+    Function used by Fanny Brun for decimal year conversion, from ragmac_xdem/data/raw/convert_dates.py.
+    Used only for checking that we're transforming the date back correctly.
+    ----
+    This function converts a date and a time to a decimal date value
+    Inputs:
+    - date_time: datetime object
+
+    Outputs:
+    - decimal_date_float: float
+    """
+    hourdec = (date_time.hour + date_time.minute / 60.0 + date_time.second / 3600.0) / 24.0
+    doy = date_time.timetuple().tm_yday
+    decimal_date = date_time.year + (doy + hourdec) / 365.25
+    decimal_date = float("{:.8f}".format(decimal_date))
+    return decimal_date
+
+
+def get_aster_date(fname) -> datetime:
+    """Parse the date of an ASTER DEM from the filename"""
+    # Extract string containing decimal year
+    basename = os.path.basename(fname)
+    decyear = float(basename[4:17])
+
+    # Convert to datetime
+    return decyear_to_date_time(decyear, leapyear=False, fannys_corr=True)
 
 
 def get_tdx_date(fname: str) -> datetime:
@@ -110,18 +167,18 @@ def best_dem_cover(dem_path_list: list, init_stats: pd.Series) -> list[str, floa
     stats_subset = init_stats.loc[np.isin(init_stats["dem_path"], dem_path_list)]
 
     # Select highest ROI coverage
-    best = stats_subset.sort_values(by='roi_cover_orig').iloc[-1]
+    best = stats_subset.sort_values(by="roi_cover_orig").iloc[-1]
 
     return best.dem_path, best.roi_cover_orig
 
 
 def dems_selection(
-        dem_path_list: list[str],
-        mode: str = None,
-        validation_dates: list[str] = None,
-        dt: float = -1,
-        months: list[int] = np.arange(12) + 1,
-        init_stats: pd.Series = None,
+    dem_path_list: list[str],
+    mode: str = None,
+    validation_dates: list[str] = None,
+    dt: float = -1,
+    months: list[int] = np.arange(12) + 1,
+    init_stats: pd.Series = None,
 ) -> list[list[str]]:
     """
     Return a list of lists of DEMs path that fit the selection.
@@ -170,7 +227,11 @@ def dems_selection(
             final_dem_list = []
             for group in output_list:
                 selected_dem, _ = best_dem_cover(group, init_stats)
-                final_dem_list.append([selected_dem, ])
+                final_dem_list.append(
+                    [
+                        selected_dem,
+                    ]
+                )
             return final_dem_list
     else:
         raise ValueError(f"Mode {mode} not recognized")
