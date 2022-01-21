@@ -80,10 +80,10 @@ def fannys_convert_date_time_to_decimal_date(date_time):
     Outputs:
     - decimal_date_float: float
     """
-    hourdec=(date_time.hour + date_time.minute/60. + date_time.second/3600.)/24.
+    hourdec = (date_time.hour + date_time.minute / 60.0 + date_time.second / 3600.0) / 24.0
     doy = date_time.timetuple().tm_yday
-    decimal_date = date_time.year + (doy+hourdec)/365.25
-    decimal_date = float('{:.8f}'.format(decimal_date))
+    decimal_date = date_time.year + (doy + hourdec) / 365.25
+    decimal_date = float("{:.8f}".format(decimal_date))
     return decimal_date
 
 
@@ -166,18 +166,18 @@ def best_dem_cover(dem_path_list: list, init_stats: pd.Series) -> list[str, floa
     stats_subset = init_stats.loc[np.isin(init_stats["dem_path"], dem_path_list)]
 
     # Select highest ROI coverage
-    best = stats_subset.sort_values(by='roi_cover_orig').iloc[-1]
+    best = stats_subset.sort_values(by="roi_cover_orig").iloc[-1]
 
     return best.dem_path, best.roi_cover_orig
 
 
 def dems_selection(
-        dem_path_list: list[str],
-        mode: str = None,
-        validation_dates: list[str] = None,
-        dt: float = -1,
-        months: list[int] = np.arange(12) + 1,
-        init_stats: pd.Series = None,
+    dem_path_list: list[str],
+    mode: str = None,
+    validation_dates: list[str] = None,
+    dt: float = -1,
+    months: list[int] = np.arange(12) + 1,
+    init_stats: pd.Series = None,
 ) -> list[list[str]]:
     """
     Return a list of lists of DEMs path that fit the selection.
@@ -226,7 +226,11 @@ def dems_selection(
             final_dem_list = []
             for group in output_list:
                 selected_dem, _ = best_dem_cover(group, init_stats)
-                final_dem_list.append([selected_dem, ])
+                final_dem_list.append(
+                    [
+                        selected_dem,
+                    ]
+                )
             return final_dem_list
     else:
         raise ValueError(f"Mode {mode} not recognized")
