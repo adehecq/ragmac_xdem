@@ -169,9 +169,12 @@ def plot_count_std(count_nmad_ma_stack,
                            interpolation='none',
                            cmap=cmap,
                            alpha=alpha),
-                 cax=cax).set_label(label='DEM count',size=12)
+                 cax=cax, extend='max').set_label(label='DEM count',size=12)
     if points:
         p, = ax.plot(points[0],points[1],marker='o',color='b',linestyle='none')
+        legend_elements = []
+        legend_elements.append(Line2D([0], [0], color='b', label='Observations', marker='o', linestyle='none'))
+        ax.legend(handles=legend_elements, loc='best')
     
     ax = axes[1]
     cmap = plt.cm.get_cmap(std_cmap)
@@ -185,7 +188,7 @@ def plot_count_std(count_nmad_ma_stack,
                            interpolation='none',
                            alpha=alpha,
                           cmap=cmap),
-                 cax=cax).set_label(label='STD [m]',size=12)
+                 cax=cax, extend='max').set_label(label='STD [m]',size=12)
     
     if points:
         p, = ax.plot(points[0],points[1],marker='o',color='b',linestyle='none')
@@ -214,26 +217,31 @@ def xr_plot_count_std_glacier(count_da,
     fig,axes = plt.subplots(1,2,figsize=(15,10))
     
     ax = axes[0]
-    cmap = plt.cm.get_cmap(count_cmap, count_vmax)
     divider = make_axes_locatable(ax)
     cax = divider.append_axes("right", size="5%", pad=0.05)
-    sm = plt.cm.ScalarMappable(cmap=cmap)
-    cbar = plt.colorbar(sm, cax=cax)
-    cbar.set_alpha(alpha) # not sure why this doesn't work....
+    cmap = plt.cm.get_cmap(count_cmap, count_vmax)
+    norm = matplotlib.colors.Normalize(vmin=count_vmin, vmax=count_vmax)
+    cbar = matplotlib.colorbar.ColorbarBase(cax, cmap=cmap, norm=norm, extend='max',alpha=alpha)
     cbar.set_label(label='DEM count',size=12)
     count_da.plot(ax=ax,cmap=cmap,add_colorbar=False,alpha=alpha,vmin=count_vmin,vmax=count_vmax)
     
-    legend_elements = [Line2D([0], [0], color='k', label='glacier outline'),
-                      Line2D([0], [0], color='orange', label='flownlines')]
-    ax.legend(handles=legend_elements, loc='best')
+    legend_elements = []
+    if isinstance(glacier_gdf, type(gpd.GeoDataFrame())):
+        legend_elements.append(Line2D([0], [0], color='k', label='Glacier Outline'))
+    if isinstance(flowline_gdf, type(gpd.GeoDataFrame())):
+        legend_elements.append(Line2D([0], [0], color='orange', label='Flowlines'))
+    if points:
+        legend_elements.append(Line2D([0], [0], color='b', label='Observations', marker='o', linestyle='none'))
+    if legend_elements:
+        ax.legend(handles=legend_elements, loc='best')
     
     
     ax = axes[1]
-    cmap = plt.cm.get_cmap(std_cmap)
     divider = make_axes_locatable(ax)
     cax = divider.append_axes("right", size="5%", pad=0.05)
-    sm = plt.cm.ScalarMappable(cmap=cmap)
-    cbar = plt.colorbar(sm, cax=cax)
+    cmap = plt.cm.get_cmap(std_cmap)
+    norm = matplotlib.colors.Normalize(vmin=std_vmin, vmax=std_vmax)
+    cbar = matplotlib.colorbar.ColorbarBase(cax, cmap=cmap, norm=norm, extend='max',alpha=alpha)
     cbar.set_alpha(alpha) # not sure why this doesn't work....
     cbar.set_label(label='STD [m]',size=12)
     std_da.plot(ax=ax,cmap=cmap,add_colorbar=False,alpha=alpha,vmin=std_vmin,vmax=std_vmax)
