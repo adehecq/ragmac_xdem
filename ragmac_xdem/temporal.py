@@ -4,10 +4,17 @@ import multiprocessing as mp
 
 import matplotlib
 import numpy as np
+import pandas as pd
+import psutil
 from sklearn import linear_model
+from sklearn.gaussian_process import GaussianProcessRegressor
+from sklearn.gaussian_process.kernels import RBF
+from sklearn.gaussian_process.kernels import ExpSineSquared
+from sklearn.gaussian_process.kernels import RationalQuadratic
+from sklearn.gaussian_process.kernels import WhiteKernel
 from tqdm import tqdm
 
-
+from ragmac_xdem import utils
 ###########
 """
 Modified from https://github.com/dshean/pygeotools/blob/master/pygeotools/lib/malib.py#L999
@@ -310,3 +317,149 @@ def ma_linreg(
         slope *= 365.25
 
     return slope, intercept, detrended_std
+
+
+"""
+@author: friedrichknuth
+"""
+
+def remove_nan_from_training_data(X_train, y_train_masked_array):
+    array = y_train_masked_array.data
+    mask = ~np.ma.getmaskarray(y_train_masked_array)                    
+    X_train = X_train[mask]
+    y_train = y_train_masked_array[mask]
+    return X_train, y_train
+
+def mask_low_count_pixels(ma_stack, n_thresh = 3):
+    count = np.ma.masked_equal(ma_stack.count(axis=0), 0).astype(np.uint16).data
+    valid_mask_2D = (count >= n_thresh)
+    valid_data = ma_stack[:, valid_mask_2D]
+    return valid_data, valid_mask_2D
+
+def create_prediction_timeseries(start_date = '2000-01-01',
+                                 end_date = '2023-01-01',
+                                 dt ='M'):
+    #M  = monthly frequency
+    #3M = every 3 months
+    #6M = every 6 months
+    d = pd.date_range(start_date,end_date,freq=dt)
+    X = d.to_series().apply([utils.date_time_to_decyear]).values.squeeze()
+    return X
+
+def linreg_predict(X_train,
+                   y_train,
+                   X,
+                   method='TheilSen'):
+    
+    if method=='Linear':
+        m = linear_model.LinearRegression()
+        m.fit(X_train.squeeze()[:,np.newaxis], y_train.squeeze())
+        slope = m.coef_
+        intercept = m.intercept_
+        prediction = m.predict(X.squeeze()[:,np.newaxis])
+
+    if method=='TheilSen':
+        m = linear_model.TheilSenRegressor()
+        m.fit(X_train.squeeze()[:,np.newaxis], y_train.squeeze())
+        slope = m.coef_
+        intercept = m.intercept_
+        prediction = m.predict(X.squeeze()[:,np.newaxis])
+
+    if method=='RANSAC':
+        m = linear_model.RANSACRegressor()
+        m.fit(X_train.squeeze()[:,np.newaxis], y_train.squeeze())
+        slope = m.estimator_.coef_
+        intercept = m.estimator_.intercept_
+        prediction = m.predict(X.squeeze()[:,np.newaxis])
+
+    return prediction, slope[0], intercept
+
+def linreg_run(args):
+    X_train, y_train_masked_array, X,  method = args
+    
+    X_train, y_train = remove_nan_from_training_data(X_train, y_train_masked_array)
+    prediction, slope, intercept = linreg_predict(X_train,
+                                                  y_train,
+                                                  X,
+                                                  method='Linear')
+    
+    return prediction
+
+def linreg_reshape_parallel_results(results, ma_stack, valid_mask_2D):
+    results_stack = []
+    for i in range(results.shape[1]):
+        m = np.ma.masked_all_like(ma_stack[0])
+        m[valid_mask_2D] = results[:,i]
+        results_stack.append(m)
+    results_stack = np.ma.stack(results_stack)
+    return results_stack
+
+def linreg_run_parallel(X_train, ma_stack, X, method='Linear'):
+    pool = mp.Pool(processes=psutil.cpu_count(logical=True))
+    args = [(X_train, ma_stack[:,i], X, method) for i in range(ma_stack.shape[1])]
+    results = pool.map(linreg_run, args)
+    return np.array(results)
+
+def GPR_kernel():
+    v = 10.0
+    long_term_trend_kernel = v**2 * RBF(length_scale=v)
+
+    seasonal_kernel = (
+        2.0 ** 2
+        * RBF(length_scale=100.0)
+        * ExpSineSquared(length_scale=1.0, periodicity=1.0, periodicity_bounds="fixed")
+    )
+
+    irregularities_kernel = 0.5 ** 2 * RationalQuadratic(length_scale=1.0, alpha=1.0)
+
+    noise_kernel = 0.1 ** 2 * RBF(length_scale=0.1) + WhiteKernel(
+        noise_level=0.1 ** 2, noise_level_bounds=(1e-5, 1e5)
+    )
+
+    kernel = (
+        long_term_trend_kernel + seasonal_kernel + irregularities_kernel + noise_kernel
+    )
+    return kernel
+
+def GPR_model(X_train, y_train, alpha=1e-10):
+    X_train = X_train.squeeze()[:,np.newaxis]
+    y_train = y_train.squeeze()
+    kernel = GPR_kernel()
+    
+    gaussian_process_model = GaussianProcessRegressor(kernel=kernel, 
+                                                      normalize_y=True,
+                                                      alpha=alpha,
+                                                      n_restarts_optimizer=9)
+    
+    gaussian_process_model = gaussian_process_model.fit(X_train, y_train)
+    
+    return gaussian_process_model
+
+def GPR_predict(gaussian_process_model, X):
+    X = X.squeeze()[:,np.newaxis]
+    mean_prediction, std_prediction = gaussian_process_model.predict(X, return_std=True)
+    
+    return mean_prediction, std_prediction
+
+def GPR_run(args):
+    X_train, y_train_masked_array, X,  method = args
+    X_train, y_train = remove_nan_from_training_data(X_train, y_train_masked_array)
+    gaussian_process_model = GPR_model(X_train, y_train, alpha=1e-10)
+    prediction, std_prediction = GPR_predict(gaussian_process_model, X)
+
+    return prediction
+
+def GPR_run_parallel(X_train, ma_stack, X, method='Linear'):
+    pool = mp.Pool(processes=psutil.cpu_count(logical=True))
+    args = [(X_train, ma_stack[:,i], X, method) for i in range(ma_stack.shape[1])]
+    results = pool.map(GPR_run, args)
+    return np.array(results)
+
+def GPR_reshape_parallel_results(results, ma_stack, valid_mask_2D):
+    results_stack = []
+    for i in range(results.shape[1]):
+        m = np.ma.masked_all_like(ma_stack[0])
+        m[valid_mask_2D] = results[:,i]
+        results_stack.append(m)
+    results_stack = np.ma.stack(results_stack)
+    return results_stack
