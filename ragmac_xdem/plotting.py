@@ -48,7 +48,7 @@ def plot_time_series_gallery(x_values,
                              x_ticks_off=False,
                              y_ticks_off=False,
                              sharex = True,
-                             figsize=(10,15),
+                             figsize=(15,10),
                              legend=True,
                              linestyle='none',
                              legend_labels = ["Observations",]):

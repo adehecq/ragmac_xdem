@@ -125,6 +125,7 @@ def xr_stack_geotifs(geotif_files_list,
     for index, file_name in enumerate(geotif_files_list):
         src = xr_read_geotif(file_name)
         if not check_xr_rio_ds_match(src,ref):
+            print("Resampling", file_name,"to", reference_geotif_file)
             src = src.rio.reproject_match(ref, 
                                           resampling = resampling)
         src = src.assign_coords({"time": datetimes_list[index]})
@@ -157,6 +158,7 @@ def check_xr_rio_ds_match(ds1,ds2):
     if (ds1['spatial_ref'].attrs == ds2['spatial_ref'].attrs) & \
        (ds1.rio.crs              == ds2.rio.crs)              & \
        (ds1.rio.bounds()         == ds2.rio.bounds())         & \
+       (ds1.rio.resolution()     == ds2.rio.resolution())     & \
        (ds1.rio.transform()      == ds2.rio.transform()):
         return True
     else:
