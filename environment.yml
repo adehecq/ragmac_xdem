@@ -1,6 +1,7 @@
 name: ragmac_xdem
 channels:
   - conda-forge
+  - oggm
 dependencies:
   - numpy
   - scipy
@@ -9,6 +10,8 @@ dependencies:
   - pandas
   - xdem
   - opencv
+  - oggm
+  - oggm-deps
   - pip
   # dev requirements
   - pytest

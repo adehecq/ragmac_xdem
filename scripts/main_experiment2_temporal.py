@@ -19,7 +19,7 @@ import rasterio as rio
 import ragmac_xdem.dem_postprocessing as pproc
 
 from ragmac_xdem import mass_balance as mb
-from ragmac_xdem import utils, files, temporal
+from ragmac_xdem import utils, files, temporal, plotting, io
 
 
 if __name__ == "__main__":
@@ -101,42 +101,121 @@ if __name__ == "__main__":
         os.path.join(outdir, fn) for fn in ['dh_slope.tif', 'dh_intercept.tif', 'dh_std.tif']
     ]
 
-    # Need to downsample DEM for speeding-up process (~ 2h with 7 cores otherwise)
-    ref_dem_lowres = ref_dem.reproject(dst_res=5 * ref_dem.res[0])
-    roi_mask = roi_outlines.create_mask(ref_dem_lowres)
-    
-    args.overwrite = True
+    args.overwrite = False
     if args.overwrite or np.any([not os.path.exists(fn) for fn in [dh_slope_fn, dh_intercept_fn, dh_std_fn]]):
-        dems_list = groups[0]
-        dem_objs = [xdem.DEM(dem_path, load_data=False) for dem_path in dems_list]
-        print("Loading and stacking DEMs")
-        dem_stack = gu.spatial_tools.stack_rasters(dem_objs, reference=ref_dem_lowres, use_ref_bounds=True)
-        dem_dates = utils.get_dems_date(dems_list)
-        common_mask = np.ma.getmaskarray(dem_stack.data).all(axis=0)
-        print("Temporal fit")
-        # stride = 1
-        # ma_stack_test = dem_stack.data[:, ::stride, ::stride]
-        # transform = rio.transform.from_origin(
-        #     ref_dem.bounds.left, ref_dem.bounds.top, ref_dem.res[0] * stride, ref_dem.res[1] * stride
-        # )
+        
+        start = datetime.now()
+        reference_dem = baltoro_paths["raw_data"]["ref_dem_path"]
+        dem_dates = utils.get_dems_date(dems_files)
+        
+        ds = io.xr_stack_geotifs(dems_files,
+                         dem_dates,
+                         reference_dem)
+        
+        ma_stack = np.ma.masked_invalid(ds['band1'].values)
 
-        results = temporal.ma_linreg(dem_stack.data, dem_dates, n_thresh=3, model='theilsen', parallel=True,
-                                     n_cpu=args.nproc, dt_stack_ptp=None, min_dt_ptp=None, smooth=False, rsq=False,
-                                     conf_test=False, remove_outliers=False)
+        print('\n### Prepare training data ###')
+        X_train = np.ma.array([utils.date_time_to_decyear(i) for i in dem_dates]).data
+        valid_data, valid_mask_2D = temporal.mask_low_count_pixels(ma_stack, n_thresh = 3)
 
-        dh_slope = gu.Raster.from_array(results[0], ref_dem_lowres.transform, ref_dem.crs, nodata=-9999)
-        dh_intercept = gu.Raster.from_array(results[1], ref_dem_lowres.transform, ref_dem.crs, nodata=-9999)
-        dh_detrended_std = gu.Raster.from_array(results[2], ref_dem_lowres.transform, ref_dem.crs, nodata=-9999)
+        print('\n### Run linear fit ###')
+        results = temporal.linreg_run_parallel(X_train, valid_data, method='TheilSen')
+        results_stack = temporal.linreg_reshape_parallel_results(results, ma_stack, valid_mask_2D)
 
-        # Save to file
+        slope     = results_stack[0]
+        intercept = results_stack[1]
+
+        now = datetime.now()
+        dt = now-start
+        print('Elapsed time:', str(dt).split(".")[0])
+
+
+        print('\n### Compute residuals ###')
+        prediction = temporal.linreg_predict_parallel(slope,X_train,intercept)
+        residuals  = ma_stack - prediction
+        residuals[:,valid_mask_2D]  = residuals[:,valid_mask_2D]
+        
+        now = datetime.now()
+        dt = now-start
+        print('Elapsed time:', str(dt).split(".")[0])
+        
+        print('\n### Compute MAD ###')
+        detrended_std = temporal.mad(residuals, axis=0)
+
+        now = datetime.now()
+        dt = now-start
+        print('Elapsed time:', str(dt).split(".")[0])
+        
+        dh_slope = gu.Raster.from_array(slope, ref_dem.transform, ref_dem.crs, nodata=-9999)
+        dh_intercept = gu.Raster.from_array(intercept, ref_dem.transform, ref_dem.crs, nodata=-9999)
+        dh_detrended_std = gu.Raster.from_array(detrended_std, ref_dem.transform, ref_dem.crs, nodata=-9999)
+        
         dh_slope.save(dh_slope_fn)
         dh_intercept.save(dh_intercept_fn)
         dh_detrended_std.save(dh_std_fn)
-
+        
     else:
         dh_slope = gu.Raster(dh_slope_fn)
         dh_intercept = gu.Raster(dh_intercept_fn)
         dh_detrended_std = gu.Raster(dh_std_fn)
+        
+
+
+        ### Encountered issues with what is commented out below
+        ### 1. np.ma.count(dem_stack.data) returns valid counts at all pixel which causes the lin reg to fail
+        ### 2. pool.imap is much slower than pool.map
+        
+        
+    # Need to downsample DEM for speeding-up process (~ 2h with 7 cores otherwise)
+#     ref_dem_lowres = ref_dem.reproject(dst_res=5 * ref_dem.res[0])
+#     roi_mask = roi_outlines.create_mask(ref_dem_lowres)
+    
+#     args.overwrite = True
+#     if args.overwrite or np.any([not os.path.exists(fn) for fn in [dh_slope_fn, dh_intercept_fn, dh_std_fn]]):
+#         dems_list = groups[0]
+#         dem_objs = [xdem.DEM(dem_path, load_data=False) for dem_path in dems_list]
+#         print("Loading and stacking DEMs")
+#         dem_stack = gu.spatial_tools.stack_rasters(dem_objs, reference=ref_dem_lowres, use_ref_bounds=True)
+#         dem_dates = utils.get_dems_date(dems_list)
+#         common_mask = np.ma.getmaskarray(dem_stack.data).all(axis=0)
+#         print("Temporal fit")
+#         # stride = 1
+#         # ma_stack_test = dem_stack.data[:, ::stride, ::stride]
+#         # transform = rio.transform.from_origin(
+#         #     ref_dem.bounds.left, ref_dem.bounds.top, ref_dem.res[0] * stride, ref_dem.res[1] * stride
+#         # )
+
+#         results = temporal.ma_linreg(dem_stack.data, dem_dates, n_thresh=3, model='theilsen', parallel=True,
+#                                      n_cpu=args.nproc, dt_stack_ptp=None, min_dt_ptp=None, smooth=False, rsq=False,
+#                                      conf_test=False, remove_outliers=False)
+
+#         dh_slope = gu.Raster.from_array(results[0], ref_dem_lowres.transform, ref_dem.crs, nodata=-9999)
+#         dh_intercept = gu.Raster.from_array(results[1], ref_dem_lowres.transform, ref_dem.crs, nodata=-9999)
+#         dh_detrended_std = gu.Raster.from_array(results[2], ref_dem_lowres.transform, ref_dem.crs, nodata=-9999)
+
+#         # Save to file
+#         dh_slope.save(dh_slope_fn)
+#         dh_intercept.save(dh_intercept_fn)
+#         dh_detrended_std.save(dh_std_fn)
+
+#     else:
+#         dh_slope = gu.Raster(dh_slope_fn)
+#         dh_intercept = gu.Raster(dh_intercept_fn)
+#         dh_detrended_std = gu.Raster(dh_std_fn)
+
+
+    print("\n### Predicting surfaces at validation dates ###")
+    validation_dates = baltoro_paths['validation_dates']
+    print("\n".join(validation_dates))    
+    predictions = []
+    for i,v in enumerate(validation_dates):
+        fn = os.path.join(outdir,v +'_validation.tif')
+        x = utils.date_time_to_decyear(datetime.strptime(v,'%Y-%m-%d'))
+        val_arr = np.ma.array(slope*x+intercept)
+        val_arr_gu = gu.Raster.from_array(val_arr, ref_dem.transform, ref_dem.crs, nodata=-9999)
+        val_arr_gu.save(fn)
+        print('Saving',fn)
+
 
     # -- Calculate elevation change for all periods -- #
 
@@ -181,6 +260,6 @@ if __name__ == "__main__":
         print(pair_id)
         fig_fn = os.path.join(outdir, f'{pair_id}_temporal_mb_fig.png')
         ddem_bins, bins_area, frac_obs, dV, dh_mean = mb.mass_balance_local_hypso(
-            ddems[pair_id], ref_dem_lowres, roi_mask, plot=True, outfig=fig_fn
+            ddems[pair_id], ref_dem, roi_mask, plot=True, outfig=fig_fn
         )
         print(f"Total volume: {dV:.1f} km3 - mean dh: {dh_mean:.2f} m")

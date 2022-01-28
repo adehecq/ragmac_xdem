@@ -5,11 +5,14 @@ from __future__ import annotations
 import os
 import re
 from datetime import datetime, timedelta
-
+import xdem
 import geoutils as gu
 import numpy as np
 import pandas as pd
-import xdem
+import geopandas as gpd
+import pathlib
+import shutil
+
 
 
 def get_satellite_type(dem_path):
@@ -258,3 +261,81 @@ def load_ref_and_masks(case_paths: dict) -> list:
     stable_mask = ~all_outlines.create_mask(ref_dem)
 
     return ref_dem, all_outlines, roi_outlines, roi_mask, stable_mask
+
+
+"""
+@author: friedrichknuth
+"""
+
+def OGGM_get_centerline(rgi_id, 
+                        crs = None, 
+                        return_longest_segment=False):
+    
+    from oggm import cfg, utils, workflow, graphics
+    
+    cfg.initialize(logging_level='CRITICAL')
+    rgi_ids = [rgi_id]
+    
+    cfg.PATHS['working_dir'] = utils.gettempdir(dirname='OGGM-centerlines', reset=True)
+    
+    # We start from prepro level 3 with all data ready - note the url here
+    base_url = 'https://cluster.klima.uni-bremen.de/~oggm/gdirs/oggm_v1.4/L3-L5_files/CRU/centerlines/qc3/pcp2.5/no_match/'
+    gdirs = workflow.init_glacier_directories(rgi_ids, 
+                                              from_prepro_level=3, 
+                                              prepro_border=40, 
+                                              prepro_base_url=base_url)
+    gdir_cl = gdirs[0]
+    center_lines = gdir_cl.read_pickle('centerlines')
+    
+    p = pathlib.Path('./rgi_tmp/')
+    p.mkdir(parents=True, exist_ok=True)
+    utils.write_centerlines_to_shape(gdir_cl, path='./rgi_tmp/tmp.shp')
+    gdf = gpd.read_file('./rgi_tmp/tmp.shp')
+    
+    shutil.rmtree('./rgi_tmp/')
+    
+    if crs:
+        gdf = gdf.to_crs(crs)
+        
+    if return_longest_segment:
+        gdf[gdf['LE_SEGMENT'] == gdf['LE_SEGMENT'].max()]
+    return gdf
+
+def get_largest_glacier_from_shapefile(shapefile, 
+                                       crs = None,
+                                       get_longest_segment=False):
+    gdf = gpd.read_file(shapefile)
+    gdf = gdf[gdf['Area'] == gdf['Area'].max()]
+    if crs:
+        gdf = gdf.to_crs(crs)
+        
+    return gdf
+
+def extract_linestring_coords(linestring):
+    """
+    Function to extract x, y coordinates from linestring object
+    
+    Input:
+    shapely.geometry.linestring.LineString
+    
+    Returns:
+    [x: np.array,y: np.array]
+    """
+    x = []
+    y = []
+    for coords in linestring.coords:
+        x.append(coords[0])
+        y.append(coords[1])
+    return [np.array(x),np.array(y)]
+
+def xr_extract_ma_arrays_at_coords(da, x_coords, y_coords):
+    
+    ma_arrays = []
+    for i,v in enumerate(x_coords):
+        sub = da.sel(x=x_coords[i], 
+                     y=y_coords[i],
+                     method='nearest') # handles point coords with greater precision than da coords
+        ma_arrays.append(np.ma.masked_invalid(sub.values))
+    ma_stack = np.ma.stack(ma_arrays,axis=1)
+    return ma_stack
+
