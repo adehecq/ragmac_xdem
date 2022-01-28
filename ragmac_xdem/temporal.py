@@ -383,6 +383,17 @@ def linreg_run(args):
     
     return slope, intercept
 
+def linreg_predict(args):
+    slope, x, intercept = args
+    prediction = slope * x + intercept
+    return prediction
+
+def linreg_predict_parallel(slope,X,intercept):
+    pool = mp.Pool(processes=psutil.cpu_count(logical=True))
+    args = [(slope,x,intercept) for x in X]
+    results = pool.map(linreg_predict, tqdm(args))
+    return np.ma.array(results)
+
 def linreg_reshape_parallel_results(results, ma_stack, valid_mask_2D):
     results_stack = []
     for i in range(results.shape[1]):
@@ -395,8 +406,9 @@ def linreg_reshape_parallel_results(results, ma_stack, valid_mask_2D):
 def linreg_run_parallel(X_train, ma_stack, method='Linear'):
     pool = mp.Pool(processes=psutil.cpu_count(logical=True))
     args = [(X_train, ma_stack[:,i], method) for i in range(ma_stack.shape[1])]
-    results = pool.map(linreg_run, args)
+    results = pool.map(linreg_run, tqdm(args))
     return np.array(results)
+
 
 def GPR_glacier_kernel():
     '''
