@@ -175,13 +175,25 @@ def best_dem_cover(dem_path_list: list, init_stats: pd.Series) -> list[str, floa
     return best.dem_path, best.roi_cover_orig
 
 
-def list_pairs_indices(ndates):
+def list_pairs(validation_dates):
     """
-    For a set of ndates dates, return a list of indexes for all possible unique pairs.
+    For a set of ndates dates, return a list of indexes and IDs for all possible unique pairs.
     For example, for ndates=3 -> [(0, 1), (0,2), (1,2)]
     """
-    return [(k1, k2) for k1 in range(ndates) for k2 in range(k1 + 1, ndates)]
+    ndates = len(validation_dates)
+    indexes = []
+    pair_ids = []
+    
+    for k1 in range(ndates):
+        for k2 in range(k1 + 1, ndates):
+            indexes.append((k1, k2))
+            date1 = validation_dates[k1]
+            date2 = validation_dates[k2]
+            pair_ids.append(f"{date1[:4]}_{date2[:4]}")  # year1_year2)
 
+    return indexes, pair_ids
+
+            
 def dems_selection(
     dem_path_list: list[str],
     mode: str = None,
@@ -225,7 +237,7 @@ def dems_selection(
 
         # Extract DEMs within all subperiods +/- buffer
         if mode == "subperiod":
-            pairs = list_pairs_indices(len(validation_dates))
+            pairs, pair_ids = list_pairs(validation_dates)
             for k1, k2 in pairs:
                 date1 = datetime.fromisoformat(validation_dates[k1]) - timedelta(dt)
                 date2 = datetime.fromisoformat(validation_dates[k2]) + timedelta(dt)
