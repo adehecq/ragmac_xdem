@@ -575,8 +575,8 @@ def merge_and_calculate_ddems(groups, validation_dates, ref_dem, mode, outdir, o
             print(date)
             dem_objs = [xdem.DEM(dem_path, load_data=False) for dem_path in dems_list]
             dem_stack = gu.spatial_tools.stack_rasters(dem_objs, reference=ref_dem, use_ref_bounds=True)
-            mosaics[date] = np.ma.median(dem_stack, axis=0)
-            
+            mosaics[date] = np.ma.median(dem_stack.data, axis=0)
+
         # Then calculate elevation changes for each subperiod
         print("Calculating elevation changes")
         for k1, k2 in pair_indexes:
