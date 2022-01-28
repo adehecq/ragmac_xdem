@@ -538,15 +538,33 @@ def postprocessing_all(
     return out_df, out_paths
 
 
-def merge_and_calculate_ddems(groups, validation_dates, ref_dem, mode, outdir, nproc=None):
+def merge_and_calculate_ddems(groups, validation_dates, ref_dem, mode, outdir, overwrite=False, nproc=None):
     """
     A function that takes all DEMs grouped by validation date, and merge and/or interpolate them in time to provide an elevation change for each validation periods.
     """
-    # Figure out all possible ddem pairs, e.g. for 3 dates (0,1), (0, 2), (1, 2)
-    pairs = [(k1, k2) for k1 in range(len(validation_dates)) for k2 in range(k1 + 1, len(validation_dates))]
+    # Figure out all possible ddem pairs and IDs
+    pair_indexes, pair_ids = utils.list_pairs(validation_dates)
+
+    # Pattern for output file names
+    def fname_func(pair_id):
+        return os.path.join(outdir, f'ddem_{pair_id}_mode_{mode}.tif')
 
     # Output dictionary, to contain all pairwise ddem arrays
     ddems = {}
+
+    # Check if output files exist
+    outfile_exist = []
+    for key in pair_ids:
+        fname = fname_func(key)
+        outfile_exist.append(os.path.exists(fname))
+
+    # If files exist, simply load them
+    if np.all(outfile_exist) and (not overwrite):
+        print("Loading existing files")
+        for key in pair_ids:
+            fname = fname_func(key)
+            ddems[key] = gu.Raster(fname)
+        return ddems
 
     if mode == "median":
 
@@ -561,7 +579,7 @@ def merge_and_calculate_ddems(groups, validation_dates, ref_dem, mode, outdir, n
             
         # Then calculate elevation changes for each subperiod
         print("Calculating elevation changes")
-        for k1, k2 in pairs:
+        for k1, k2 in pair_indexes:
             date1 = validation_dates[k1]
             date2 = validation_dates[k2]
             if (date1 in mosaics.keys()) & (date2 in mosaics.keys()):
@@ -570,12 +588,10 @@ def merge_and_calculate_ddems(groups, validation_dates, ref_dem, mode, outdir, n
 
     elif mode == "shean":
 
-        for count, pair in enumerate(pairs):
+        for count, pair in enumerate(pair_indexes):
             k1, k2 = pair
-            date1 = validation_dates[k1]
-            date2 = validation_dates[k2]
             dems_list = groups[count]
-            pair_id = f"{date1[:4]}_{date2[:4]}"  # year1_year2
+            pair_id = pair_ids[count]
             print(f"\nProcessing pair {pair_id}")
 
             # First stack all DEMs and reproject to reference if needed
@@ -591,6 +607,8 @@ def merge_and_calculate_ddems(groups, validation_dates, ref_dem, mode, outdir, n
             slope, intercept, detrended_std = results
 
             # Finally, calculate total elevation change
+            date1 = validation_dates[k1]
+            date2 = validation_dates[k2]
             date1_dt = datetime.strptime(date1, "%Y-%m-%d")
             date2_dt = datetime.strptime(date2, "%Y-%m-%d")
             dyear = (date2_dt - date1_dt).total_seconds() / (3600 * 24 * 365.25)
@@ -598,11 +616,11 @@ def merge_and_calculate_ddems(groups, validation_dates, ref_dem, mode, outdir, n
 
     elif mode == "knuth":
 
-        for count, pair in enumerate(pairs):
+        for count, pair in enumerate(pair_indexes):
             k1, k2 = pair
             date1 = validation_dates[k1]
             date2 = validation_dates[k2]
-            pair_id = f"{date1[:4]}_{date2[:4]}"  # year1_year2
+            pair_id = pair_ids[count]
             print(f"\nProcessing pair {pair_id}")
 
             # First stack all DEMs
@@ -664,8 +682,8 @@ def merge_and_calculate_ddems(groups, validation_dates, ref_dem, mode, outdir, n
 
     # Save files
     for key in list(ddems.keys()):
-        fname = os.path.join(outdir, f'ddem_{key}_mode_{mode}.tif')
+        fname = fname_func(key)
         ddems[key].save(fname)
-        print(f"Saved to file {fname}"))
-        
+        print(f"Saved to file {fname}")
+
     return ddems
