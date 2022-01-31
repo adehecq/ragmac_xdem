@@ -3,16 +3,16 @@
 from __future__ import annotations
 
 import os
+import pathlib
 import re
+import shutil
 from datetime import datetime, timedelta
-import xdem
+
+import geopandas as gpd
 import geoutils as gu
 import numpy as np
 import pandas as pd
-import geopandas as gpd
-import pathlib
-import shutil
-
+import xdem
 
 
 def get_satellite_type(dem_path):
@@ -175,6 +175,25 @@ def best_dem_cover(dem_path_list: list, init_stats: pd.Series) -> list[str, floa
     return best.dem_path, best.roi_cover_orig
 
 
+def list_pairs(validation_dates):
+    """
+    For a set of ndates dates, return a list of indexes and IDs for all possible unique pairs.
+    For example, for ndates=3 -> [(0, 1), (0,2), (1,2)]
+    """
+    ndates = len(validation_dates)
+    indexes = []
+    pair_ids = []
+    
+    for k1 in range(ndates):
+        for k2 in range(k1 + 1, ndates):
+            indexes.append((k1, k2))
+            date1 = validation_dates[k1]
+            date2 = validation_dates[k2]
+            pair_ids.append(f"{date1[:4]}_{date2[:4]}")  # year1_year2)
+
+    return indexes, pair_ids
+
+            
 def dems_selection(
     dem_path_list: list[str],
     mode: str = None,
@@ -186,34 +205,48 @@ def dems_selection(
     """
     Return a list of lists of DEMs path that fit the selection.
 
-    Selection mode include None, 'temporal' or 'best'.
+    Selection mode include None, 'close', 'best' or 'subperiod'.
     If None, return all DEMs.
-    If 'temporal' is set, `dt`, 'validation_dates` and optionally `months` must be set. Returns all DEMs within the time window.
-    If 'best' is set, 'init_stats' must be provided. Select DEMs based on the temporal selection, but only returns a single DEM with the highest ROI coverage.
+    If any other mode is set, `dt` and `validation_dates` must be set.
+    If 'close' is set, optionally `months` can be set. Returns all DEMs within dt days around each validation date, and within the selected months.
+    If 'subperiod' is set, returns all DEMs within each possible subperiods from pairs of validation_dates, +/- dt days.
+    If 'best' is set, 'init_stats' must be provided. Select DEMs based on the 'close' selection, but only returns a single DEM with the highest ROI coverage.
 
     :param dem_path_list: List containing path to all DEMs to be considered
-    :param mode" Any of None or "temporal"
+    :param mode" Any of None, 'close', 'subperiod' or 'best'.
     :param validation_dates: List of validation dates for the experiment, dates expressed as 'yyyy-mm-dd'
     :param dt: Number of days allowed around each validation date
     :param months: A list of months to be selected (numbered 1 to 12). Default is all months.
     :params init_stats: a pd.Series containing the statistics of all DEMs as returned by dem_postprocessing.calculate_init_stats_parallel.
-    :returns: List of same length as validation dates, containing lists of DEM paths for each validation date.
+    :returns: List containing lists of DEM paths for each validation date. Same length as validation dates, or as the number of possible pair combinations for mode 'subperiod'.
     """
     if mode is None:
         print(f"Found {len(dem_path_list)} DEMs")
         return [dem_path_list]
 
-    elif mode == "temporal" or mode == "best":
+    elif mode == "close" or mode == "best" or mode == "subperiod":
         # check that optional arguments are set
         assert validation_dates is not None, "`validation_dates` must be set"
         assert dt >= 0, "dt must be set to >= 0 value"
-
+        
         # Get input DEM dates
         dems_dates = get_dems_date(dem_path_list)
         dems_months = np.asarray([date.month for date in dems_dates])
 
-        # Compare to each validation date
         output_list = []
+
+        # Extract DEMs within all subperiods +/- buffer
+        if mode == "subperiod":
+            pairs, pair_ids = list_pairs(validation_dates)
+            for k1, k2 in pairs:
+                date1 = datetime.fromisoformat(validation_dates[k1]) - timedelta(dt)
+                date2 = datetime.fromisoformat(validation_dates[k2]) + timedelta(dt)
+                matching_dates = np.where((date1 <= dems_dates) & (dems_dates <= date2) & np.isin(dems_months, months))[0]
+                output_list.append(dem_path_list[matching_dates])
+                print(f"For period {validation_dates[k1]} - {validation_dates[k2]} found {len(matching_dates)} DEMs")
+            return output_list
+
+        # Compare to each validation date
         for date_str in validation_dates:
             date = datetime.fromisoformat(date_str)
             date1 = date - timedelta(dt)
@@ -221,7 +254,7 @@ def dems_selection(
             matching_dates = np.where((date1 <= dems_dates) & (dems_dates <= date2) & np.isin(dems_months, months))[0]
             output_list.append(dem_path_list[matching_dates])
 
-        if mode == "temporal":
+        if mode == "close":
             for date, group in zip(validation_dates, output_list):
                 print(f"For date {date} found {len(group)} DEMs")
             return output_list
@@ -271,7 +304,7 @@ def OGGM_get_centerline(rgi_id,
                         crs = None, 
                         return_longest_segment=False):
     
-    from oggm import cfg, utils, workflow, graphics
+    from oggm import cfg, graphics, utils, workflow
     
     cfg.initialize(logging_level='CRITICAL')
     rgi_ids = [rgi_id]

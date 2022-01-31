@@ -7,6 +7,7 @@ import concurrent.futures
 import multiprocessing as mp
 import os
 import threading
+from datetime import datetime
 
 from glob import glob
 from typing import Callable
@@ -21,7 +22,7 @@ import xdem
 
 from skimage.morphology import disk
 from tqdm import tqdm
-from ragmac_xdem import utils
+from ragmac_xdem import utils, temporal, io
 
 # Turn off imshow's interpolation to avoid gaps spread in plots
 plt.rcParams["image.interpolation"] = "none"
@@ -440,6 +441,9 @@ def postprocessing_all(
             "Input `dem_path_list` not understood, must be a list of strings, or list of list of strings"
         )
 
+    # Remove possible duplicates
+    dem_to_process = np.unique(dem_to_process)
+
     # Needed to avoid errors when plotting on MacOS
     old_backend = mpl.get_backend()
     mpl.use("Agg")
@@ -532,3 +536,154 @@ def postprocessing_all(
         out_paths.extend(out_df[out_df["ID"].isin(dem_IDs)]['coreg_path'].values)
 
     return out_df, out_paths
+
+
+def merge_and_calculate_ddems(groups, validation_dates, ref_dem, mode, outdir, overwrite=False, nproc=None):
+    """
+    A function that takes all DEMs grouped by validation date, and merge and/or interpolate them in time to provide an elevation change for each validation periods.
+    """
+    # Figure out all possible ddem pairs and IDs
+    pair_indexes, pair_ids = utils.list_pairs(validation_dates)
+
+    # Pattern for output file names
+    def fname_func(pair_id):
+        return os.path.join(outdir, f'ddem_{pair_id}_mode_{mode}.tif')
+
+    # Output dictionary, to contain all pairwise ddem arrays
+    ddems = {}
+
+    # Check if output files exist
+    outfile_exist = []
+    for key in pair_ids:
+        fname = fname_func(key)
+        outfile_exist.append(os.path.exists(fname))
+
+    # If files exist, simply load them
+    if np.all(outfile_exist) and (not overwrite):
+        print("Loading existing files")
+        for key in pair_ids:
+            fname = fname_func(key)
+            ddems[key] = gu.Raster(fname)
+        return ddems
+
+    if mode == "median":
+
+        # First stack all DEMs and reproject to reference if needed
+        print("Loading and stacking DEMs")
+        mosaics = {}
+        for date, dems_list in zip(validation_dates, groups):
+            print(date)
+            dem_objs = [xdem.DEM(dem_path, load_data=False) for dem_path in dems_list]
+            dem_stack = gu.spatial_tools.stack_rasters(dem_objs, reference=ref_dem, use_ref_bounds=True)
+            mosaics[date] = np.ma.median(dem_stack.data, axis=0)
+
+        # Then calculate elevation changes for each subperiod
+        print("Calculating elevation changes")
+        for k1, k2 in pair_indexes:
+            date1 = validation_dates[k1]
+            date2 = validation_dates[k2]
+            if (date1 in mosaics.keys()) & (date2 in mosaics.keys()):
+                pair_id = f"{date1[:4]}_{date2[:4]}"  # year1_year2
+                ddems[pair_id] = mosaics[date2] - mosaics[date1]
+
+    elif mode == "shean":
+
+        for count, pair in enumerate(pair_indexes):
+            k1, k2 = pair
+            dems_list = groups[count]
+            pair_id = pair_ids[count]
+            print(f"\nProcessing pair {pair_id}")
+
+            # First stack all DEMs and reproject to reference if needed
+            dem_objs = [xdem.DEM(dem_path, load_data=False) for dem_path in dems_list]
+            dem_stack = gu.spatial_tools.stack_rasters(dem_objs, reference=ref_dem, use_ref_bounds=True)
+
+            # Then calculate linear fit
+            dem_dates = utils.get_dems_date(dems_list)
+            results = temporal.ma_linreg(dem_stack.data, dem_dates, n_thresh=3, model='theilsen', parallel=True,
+                                         n_cpu=nproc, dt_stack_ptp=None, min_dt_ptp=None, smooth=False, rsq=False,
+                                         conf_test=False, remove_outliers=False)
+
+            slope, intercept, detrended_std = results
+
+            # Finally, calculate total elevation change
+            date1 = validation_dates[k1]
+            date2 = validation_dates[k2]
+            date1_dt = datetime.strptime(date1, "%Y-%m-%d")
+            date2_dt = datetime.strptime(date2, "%Y-%m-%d")
+            dyear = (date2_dt - date1_dt).total_seconds() / (3600 * 24 * 365.25)
+            ddems[pair_id] = dyear * slope
+
+    elif mode == "knuth":
+
+        for count, pair in enumerate(pair_indexes):
+            k1, k2 = pair
+            date1 = validation_dates[k1]
+            date2 = validation_dates[k2]
+            pair_id = pair_ids[count]
+            print(f"\nProcessing pair {pair_id}")
+
+            # First stack all DEMs
+            start = datetime.now()
+            dems_list = groups[count]
+            dem_dates = utils.get_dems_date(dems_list)
+
+            ds = io.xr_stack_geotifs(dems_list,
+                                     dem_dates,
+                                     ref_dem.filename)
+
+            ma_stack = np.ma.masked_invalid(ds['band1'].values)
+
+            print('\n### Prepare training data ###')
+            X_train = np.ma.array([utils.date_time_to_decyear(i) for i in dem_dates]).data
+            valid_data, valid_mask_2D = temporal.mask_low_count_pixels(ma_stack, n_thresh = 3)
+
+            # Then calculate linear fit
+            print('\n### Run linear fit ###')
+            results = temporal.linreg_run_parallel(X_train, valid_data, method='TheilSen')
+            results_stack = temporal.linreg_reshape_parallel_results(results, ma_stack, valid_mask_2D)
+
+            slope = results_stack[0]
+            intercept = results_stack[1]
+        
+            now = datetime.now()
+            dt = now-start
+            print('Elapsed time:', str(dt).split(".")[0])
+
+            # Not needed for now
+            # print('\n### Compute residuals ###')
+            # prediction = temporal.linreg_predict_parallel(slope,X_train,intercept)
+            # residuals  = ma_stack - prediction
+            # residuals[:,valid_mask_2D]  = residuals[:,valid_mask_2D]
+            
+            # now = datetime.now()
+            # dt = now-start
+            # print('Elapsed time:', str(dt).split(".")[0])
+            
+            # print('\n### Compute MAD ###')
+            # detrended_std = temporal.mad(residuals, axis=0)
+
+            # now = datetime.now()
+            # dt = now-start
+            # print('Elapsed time:', str(dt).split(".")[0])
+            
+            # Finally, calculate total elevation change
+            date1_dt = datetime.strptime(date1, "%Y-%m-%d")
+            date2_dt = datetime.strptime(date2, "%Y-%m-%d")
+            dyear = (date2_dt - date1_dt).total_seconds() / (3600 * 24 * 365.25)
+            ddems[pair_id] = dyear * slope
+
+    else:
+        raise NotImplementedError("`mode` must be either of 'median', 'shean' or 'knuth'")
+
+    # Convert masked arrays to gu.Raster
+    for key in list(ddems.keys()):
+        ddems[key] = gu.Raster.from_array(ddems[key], ref_dem.transform, ref_dem.crs, nodata=-9999)
+
+    # Save files
+    for key in list(ddems.keys()):
+        fname = fname_func(key)
+        ddems[key].save(fname)
+        print(f"Saved to file {fname}")
+
+    return ddems
