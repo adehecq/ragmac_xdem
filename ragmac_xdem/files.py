@@ -1,13 +1,11 @@
 """Important info on all files to be processed"""
 
 import os
-
 from glob import glob
 
 import numpy as np
-import toml
 import pandas as pd
-
+import toml
 
 # Base directory of the project
 BASE_DIR = os.path.abspath(os.path.join(os.path.join(os.path.dirname(__file__), os.path.pardir)))
@@ -30,7 +28,7 @@ def get_data_paths(case: str) -> dict:
     elif case in cfg["experiment_2"]["cases"]:
         exp = "experiment_2"
     else:
-        all_cases = cfg['experiment_1']["cases"] + cfg['experiment_2']["cases"]
+        all_cases = cfg["experiment_1"]["cases"] + cfg["experiment_2"]["cases"]
         raise ValueError(f"Case {case} not found, nust be in {all_cases}")
 
     # Nested dictionary containing experiment_number -> case -> path to all needed data sets
@@ -76,19 +74,24 @@ def load_mb_series(region: str) -> pd.Series:
     """
     Load the MB series from WGMS, for a given region.
     """
-    mb_file = os.path.join(BASE_DIR, 'data', 'raw', 'regional_mb_series', 'regional_adhoc_estimates_BA_anom_mwe.csv')
+    mb_file = os.path.join(BASE_DIR, "data", "raw", "regional_mb_series", "regional_adhoc_estimates_BA_anom_mwe.csv")
 
     # Read CSV, convert year string to integer and use region as index
-    mb_series = pd.read_csv(mb_file,
-                            names=["Region", ] + list(np.arange(2000, 2021)),
-                            header=0,
-                            index_col='Region'
-                            )
+    mb_series = pd.read_csv(
+        mb_file,
+        names=[
+            "Region",
+        ]
+        + list(np.arange(2000, 2021)),
+        header=0,
+        index_col="Region",
+    )
 
     if region not in mb_series.index:
         raise ValueError(f"`region` must be in {list(mb_series.index)}")
 
     return mb_series.loc[region]
+
 
 # def check():
 #     """

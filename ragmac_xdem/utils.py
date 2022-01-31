@@ -183,7 +183,7 @@ def list_pairs(validation_dates):
     ndates = len(validation_dates)
     indexes = []
     pair_ids = []
-    
+
     for k1 in range(ndates):
         for k2 in range(k1 + 1, ndates):
             indexes.append((k1, k2))
@@ -193,7 +193,7 @@ def list_pairs(validation_dates):
 
     return indexes, pair_ids
 
-            
+
 def dems_selection(
     dem_path_list: list[str],
     mode: str = None,
@@ -228,7 +228,7 @@ def dems_selection(
         # check that optional arguments are set
         assert validation_dates is not None, "`validation_dates` must be set"
         assert dt >= 0, "dt must be set to >= 0 value"
-        
+
         # Get input DEM dates
         dems_dates = get_dems_date(dem_path_list)
         dems_months = np.asarray([date.month for date in dems_dates])
@@ -241,7 +241,9 @@ def dems_selection(
             for k1, k2 in pairs:
                 date1 = datetime.fromisoformat(validation_dates[k1]) - timedelta(dt)
                 date2 = datetime.fromisoformat(validation_dates[k2]) + timedelta(dt)
-                matching_dates = np.where((date1 <= dems_dates) & (dems_dates <= date2) & np.isin(dems_months, months))[0]
+                matching_dates = np.where((date1 <= dems_dates) & (dems_dates <= date2) & np.isin(dems_months, months))[
+                    0
+                ]
                 output_list.append(dem_path_list[matching_dates])
                 print(f"For period {validation_dates[k1]} - {validation_dates[k2]} found {len(matching_dates)} DEMs")
             return output_list
@@ -300,57 +302,55 @@ def load_ref_and_masks(case_paths: dict) -> list:
 @author: friedrichknuth
 """
 
-def OGGM_get_centerline(rgi_id, 
-                        crs = None, 
-                        return_longest_segment=False):
-    
+
+def OGGM_get_centerline(rgi_id, crs=None, return_longest_segment=False):
+
     from oggm import cfg, graphics, utils, workflow
-    
-    cfg.initialize(logging_level='CRITICAL')
+
+    cfg.initialize(logging_level="CRITICAL")
     rgi_ids = [rgi_id]
-    
-    cfg.PATHS['working_dir'] = utils.gettempdir(dirname='OGGM-centerlines', reset=True)
-    
+
+    cfg.PATHS["working_dir"] = utils.gettempdir(dirname="OGGM-centerlines", reset=True)
+
     # We start from prepro level 3 with all data ready - note the url here
-    base_url = 'https://cluster.klima.uni-bremen.de/~oggm/gdirs/oggm_v1.4/L3-L5_files/CRU/centerlines/qc3/pcp2.5/no_match/'
-    gdirs = workflow.init_glacier_directories(rgi_ids, 
-                                              from_prepro_level=3, 
-                                              prepro_border=40, 
-                                              prepro_base_url=base_url)
+    base_url = (
+        "https://cluster.klima.uni-bremen.de/~oggm/gdirs/oggm_v1.4/L3-L5_files/CRU/centerlines/qc3/pcp2.5/no_match/"
+    )
+    gdirs = workflow.init_glacier_directories(rgi_ids, from_prepro_level=3, prepro_border=40, prepro_base_url=base_url)
     gdir_cl = gdirs[0]
-    center_lines = gdir_cl.read_pickle('centerlines')
-    
-    p = pathlib.Path('./rgi_tmp/')
+    center_lines = gdir_cl.read_pickle("centerlines")
+
+    p = pathlib.Path("./rgi_tmp/")
     p.mkdir(parents=True, exist_ok=True)
-    utils.write_centerlines_to_shape(gdir_cl, path='./rgi_tmp/tmp.shp')
-    gdf = gpd.read_file('./rgi_tmp/tmp.shp')
-    
-    shutil.rmtree('./rgi_tmp/')
-    
+    utils.write_centerlines_to_shape(gdir_cl, path="./rgi_tmp/tmp.shp")
+    gdf = gpd.read_file("./rgi_tmp/tmp.shp")
+
+    shutil.rmtree("./rgi_tmp/")
+
     if crs:
         gdf = gdf.to_crs(crs)
-        
+
     if return_longest_segment:
-        gdf[gdf['LE_SEGMENT'] == gdf['LE_SEGMENT'].max()]
+        gdf[gdf["LE_SEGMENT"] == gdf["LE_SEGMENT"].max()]
     return gdf
 
-def get_largest_glacier_from_shapefile(shapefile, 
-                                       crs = None,
-                                       get_longest_segment=False):
+
+def get_largest_glacier_from_shapefile(shapefile, crs=None, get_longest_segment=False):
     gdf = gpd.read_file(shapefile)
-    gdf = gdf[gdf['Area'] == gdf['Area'].max()]
+    gdf = gdf[gdf["Area"] == gdf["Area"].max()]
     if crs:
         gdf = gdf.to_crs(crs)
-        
+
     return gdf
+
 
 def extract_linestring_coords(linestring):
     """
     Function to extract x, y coordinates from linestring object
-    
+
     Input:
     shapely.geometry.linestring.LineString
-    
+
     Returns:
     [x: np.array,y: np.array]
     """
@@ -359,16 +359,16 @@ def extract_linestring_coords(linestring):
     for coords in linestring.coords:
         x.append(coords[0])
         y.append(coords[1])
-    return [np.array(x),np.array(y)]
+    return [np.array(x), np.array(y)]
+
 
 def xr_extract_ma_arrays_at_coords(da, x_coords, y_coords):
-    
-    ma_arrays = []
-    for i,v in enumerate(x_coords):
-        sub = da.sel(x=x_coords[i], 
-                     y=y_coords[i],
-                     method='nearest') # handles point coords with greater precision than da coords
-        ma_arrays.append(np.ma.masked_invalid(sub.values))
-    ma_stack = np.ma.stack(ma_arrays,axis=1)
-    return ma_stack
 
+    ma_arrays = []
+    for i, v in enumerate(x_coords):
+        sub = da.sel(
+            x=x_coords[i], y=y_coords[i], method="nearest"
+        )  # handles point coords with greater precision than da coords
+        ma_arrays.append(np.ma.masked_invalid(sub.values))
+    ma_stack = np.ma.stack(ma_arrays, axis=1)
+    return ma_stack

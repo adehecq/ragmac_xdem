@@ -6,7 +6,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import xdem
-
 from geoutils.georaster import RasterType
 from scipy.interpolate import interp1d
 

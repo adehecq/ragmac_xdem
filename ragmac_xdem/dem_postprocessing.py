@@ -8,7 +8,6 @@ import multiprocessing as mp
 import os
 import threading
 from datetime import datetime
-
 from glob import glob
 from typing import Callable
 
@@ -19,10 +18,10 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import xdem
-
 from skimage.morphology import disk
 from tqdm import tqdm
-from ragmac_xdem import utils, temporal, io
+
+from ragmac_xdem import io, temporal, utils
 
 # Turn off imshow's interpolation to avoid gaps spread in plots
 plt.rcParams["image.interpolation"] = "none"
@@ -93,7 +92,11 @@ def calculate_init_stats_single(
     roi_coverage_orig, nstable_orig, med_orig, nmad_orig = calculate_stats(ddem, roi_mask, stable_mask)
 
     # Calculate DEM date
-    dem_date = utils.get_dems_date([dem_path, ])
+    dem_date = utils.get_dems_date(
+        [
+            dem_path,
+        ]
+    )
 
     return (
         os.path.basename(dem_path),
@@ -437,9 +440,7 @@ def postprocessing_all(
     elif isinstance(dem_path_list[0], str):
         dem_to_process = [fp for fp in dem_path_list if os.path.basename(fp) not in existing]
     else:
-        raise ValueError(
-            "Input `dem_path_list` not understood, must be a list of strings, or list of list of strings"
-        )
+        raise ValueError("Input `dem_path_list` not understood, must be a list of strings, or list of list of strings")
 
     # Remove possible duplicates
     dem_to_process = np.unique(dem_to_process)
@@ -530,10 +531,10 @@ def postprocessing_all(
     if isinstance(dem_path_list[0], (list, tuple, np.ndarray)):
         for group in dem_path_list:
             dem_IDs = np.asarray([os.path.basename(dem_path) for dem_path in group])
-            out_paths.append(out_df[out_df["ID"].isin(dem_IDs)]['coreg_path'].values)
+            out_paths.append(out_df[out_df["ID"].isin(dem_IDs)]["coreg_path"].values)
     elif isinstance(dem_path_list[0], str):
         dem_IDs = np.asarray([os.path.basename(dem_path) for dem_path in dem_path_list])
-        out_paths.extend(out_df[out_df["ID"].isin(dem_IDs)]['coreg_path'].values)
+        out_paths.extend(out_df[out_df["ID"].isin(dem_IDs)]["coreg_path"].values)
 
     return out_df, out_paths
 
@@ -547,7 +548,7 @@ def merge_and_calculate_ddems(groups, validation_dates, ref_dem, mode, outdir, o
 
     # Pattern for output file names
     def fname_func(pair_id):
-        return os.path.join(outdir, f'ddem_{pair_id}_mode_{mode}.tif')
+        return os.path.join(outdir, f"ddem_{pair_id}_mode_{mode}.tif")
 
     # Output dictionary, to contain all pairwise ddem arrays
     ddems = {}
@@ -600,9 +601,20 @@ def merge_and_calculate_ddems(groups, validation_dates, ref_dem, mode, outdir, o
 
             # Then calculate linear fit
             dem_dates = utils.get_dems_date(dems_list)
-            results = temporal.ma_linreg(dem_stack.data, dem_dates, n_thresh=3, model='theilsen', parallel=True,
-                                         n_cpu=nproc, dt_stack_ptp=None, min_dt_ptp=None, smooth=False, rsq=False,
-                                         conf_test=False, remove_outliers=False)
+            results = temporal.ma_linreg(
+                dem_stack.data,
+                dem_dates,
+                n_thresh=3,
+                model="theilsen",
+                parallel=True,
+                n_cpu=nproc,
+                dt_stack_ptp=None,
+                min_dt_ptp=None,
+                smooth=False,
+                rsq=False,
+                conf_test=False,
+                remove_outliers=False,
+            )
 
             slope, intercept, detrended_std = results
 
@@ -628,45 +640,43 @@ def merge_and_calculate_ddems(groups, validation_dates, ref_dem, mode, outdir, o
             dems_list = groups[count]
             dem_dates = utils.get_dems_date(dems_list)
 
-            ds = io.xr_stack_geotifs(dems_list,
-                                     dem_dates,
-                                     ref_dem.filename)
+            ds = io.xr_stack_geotifs(dems_list, dem_dates, ref_dem.filename)
 
-            ma_stack = np.ma.masked_invalid(ds['band1'].values)
+            ma_stack = np.ma.masked_invalid(ds["band1"].values)
 
-            print('\n### Prepare training data ###')
+            print("\n### Prepare training data ###")
             X_train = np.ma.array([utils.date_time_to_decyear(i) for i in dem_dates]).data
-            valid_data, valid_mask_2D = temporal.mask_low_count_pixels(ma_stack, n_thresh = 3)
+            valid_data, valid_mask_2D = temporal.mask_low_count_pixels(ma_stack, n_thresh=3)
 
             # Then calculate linear fit
-            print('\n### Run linear fit ###')
-            results = temporal.linreg_run_parallel(X_train, valid_data, method='TheilSen')
+            print("\n### Run linear fit ###")
+            results = temporal.linreg_run_parallel(X_train, valid_data, method="TheilSen")
             results_stack = temporal.linreg_reshape_parallel_results(results, ma_stack, valid_mask_2D)
 
             slope = results_stack[0]
             intercept = results_stack[1]
-        
+
             now = datetime.now()
-            dt = now-start
-            print('Elapsed time:', str(dt).split(".")[0])
+            dt = now - start
+            print("Elapsed time:", str(dt).split(".")[0])
 
             # Not needed for now
             # print('\n### Compute residuals ###')
             # prediction = temporal.linreg_predict_parallel(slope,X_train,intercept)
             # residuals  = ma_stack - prediction
             # residuals[:,valid_mask_2D]  = residuals[:,valid_mask_2D]
-            
+
             # now = datetime.now()
             # dt = now-start
             # print('Elapsed time:', str(dt).split(".")[0])
-            
+
             # print('\n### Compute MAD ###')
             # detrended_std = temporal.mad(residuals, axis=0)
 
             # now = datetime.now()
             # dt = now-start
             # print('Elapsed time:', str(dt).split(".")[0])
-            
+
             # Finally, calculate total elevation change
             date1_dt = datetime.strptime(date1, "%Y-%m-%d")
             date2_dt = datetime.strptime(date2, "%Y-%m-%d")

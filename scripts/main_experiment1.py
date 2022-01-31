@@ -13,10 +13,9 @@ import numpy as np
 import xdem
 
 import ragmac_xdem.dem_postprocessing as pproc
-
+from ragmac_xdem import files
 from ragmac_xdem import mass_balance as mb
-from ragmac_xdem import utils, files
-
+from ragmac_xdem import utils
 
 if __name__ == "__main__":
 

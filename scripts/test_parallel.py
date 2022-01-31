@@ -13,14 +13,12 @@ Single thread took 189.5693130493164 s
 """
 
 import os
-
 from time import time
 
 import geoutils as gu
 import xdem
 
 import ragmac_xdem.dem_postprocessing as pproc
-
 
 if __name__ == "__main__":
 

@@ -15,10 +15,9 @@ import numpy as np
 import xdem
 
 import ragmac_xdem.dem_postprocessing as pproc
-
+from ragmac_xdem import files
 from ragmac_xdem import mass_balance as mb
-from ragmac_xdem import utils, files
-
+from ragmac_xdem import utils
 
 if __name__ == "__main__":
 
@@ -68,21 +67,21 @@ if __name__ == "__main__":
         raise NotImplementedError
 
     # -- Select different processing modes -- #
-    if args.mode == 'median':
+    if args.mode == "median":
         selection_opts = {"mode": "close", "dt": 365, "months": [8, 9, 10]}
         merge_opts = {"mode": "median"}
-        outdir = os.path.join(baltoro_paths["processed_data"]['directory'], 'results_median')
+        outdir = os.path.join(baltoro_paths["processed_data"]["directory"], "results_median")
         downsampling = 1
-    elif args.mode == 'shean':
+    elif args.mode == "shean":
         selection_opts = {"mode": "subperiod", "dt": 365}
         downsampling = 10
         merge_opts = {"mode": "shean"}
-        outdir = os.path.join(baltoro_paths["processed_data"]['directory'], 'results_shean')
-    elif args.mode == 'knuth':
+        outdir = os.path.join(baltoro_paths["processed_data"]["directory"], "results_shean")
+    elif args.mode == "knuth":
         selection_opts = {"mode": "subperiod", "dt": 365}
         downsampling = 1
         merge_opts = {"mode": "knuth"}
-        outdir = os.path.join(baltoro_paths["processed_data"]['directory'], 'results_knuth')
+        outdir = os.path.join(baltoro_paths["processed_data"]["directory"], "results_knuth")
     else:
         raise ValueError("`mode` must be either of 'median', 'shean' or knuth'")
 
@@ -95,8 +94,10 @@ if __name__ == "__main__":
 
     # -- Calculate initial DEM statistics -- #
     print("\n### Calculate initial statistics ###")
-    stats_file = os.path.join(coreg_dir, 'init_stats.csv')
-    init_stats = pproc.calculate_init_stats_parallel(dems_files, ref_dem, roi_outlines, all_outlines, stats_file, nthreads=args.nproc, overwrite=args.overwrite)
+    stats_file = os.path.join(coreg_dir, "init_stats.csv")
+    init_stats = pproc.calculate_init_stats_parallel(
+        dems_files, ref_dem, roi_outlines, all_outlines, stats_file, nthreads=args.nproc, overwrite=args.overwrite
+    )
     print(f"Statistics file saved to {stats_file}")
 
     # -- Select DEMs to be processed -- #
@@ -127,7 +128,9 @@ if __name__ == "__main__":
     # -- Merge DEMs by period -- #
     print("\n### Merge DEMs ###")
 
-    ddems = pproc.merge_and_calculate_ddems(groups_coreg, validation_dates, ref_dem, outdir=outdir, overwrite=args.overwrite, **merge_opts)
+    ddems = pproc.merge_and_calculate_ddems(
+        groups_coreg, validation_dates, ref_dem, outdir=outdir, overwrite=args.overwrite, **merge_opts
+    )
 
     # -- Plot -- #
 
@@ -145,16 +148,16 @@ if __name__ == "__main__":
         ax.set_title(pair_id)
 
     plt.tight_layout()
-    fig_fn = os.path.join(outdir, 'ddem_fig.png')
+    fig_fn = os.path.join(outdir, "ddem_fig.png")
     plt.savefig(fig_fn)
-    #plt.show()
+    # plt.show()
 
     # -- Calculating MB -- #
     print("\n### Calculating mass balance ###")
     for k, pair_id in enumerate(ddems):
 
         print(pair_id)
-        fig_fn = os.path.join(outdir, f'{pair_id}_mb_fig.png')
+        fig_fn = os.path.join(outdir, f"{pair_id}_mb_fig.png")
         ddem_bins, bins_area, frac_obs, dV, dh_mean = mb.mass_balance_local_hypso(
             ddems[pair_id], ref_dem, roi_mask, plot=True, outfig=fig_fn
         )
