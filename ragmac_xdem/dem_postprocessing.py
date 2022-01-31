@@ -630,10 +630,10 @@ def merge_and_calculate_ddems(groups, validation_dates, ref_dem, mode, outdir, o
 
             ds = io.xr_stack_geotifs(dems_list,
                                      dem_dates,
-                                     ref_dem.ds)
-        
+                                     ref_dem.filename)
+
             ma_stack = np.ma.masked_invalid(ds['band1'].values)
-        
+
             print('\n### Prepare training data ###')
             X_train = np.ma.array([utils.date_time_to_decyear(i) for i in dem_dates]).data
             valid_data, valid_mask_2D = temporal.mask_low_count_pixels(ma_stack, n_thresh = 3)
