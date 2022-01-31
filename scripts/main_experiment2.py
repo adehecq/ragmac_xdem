@@ -33,6 +33,13 @@ if __name__ == "__main__":
         help="str, the satellite data to be used, either 'ASTER', 'TDX' or 'both'",
     )
     parser.add_argument(
+        "-mode",
+        dest="mode",
+        type=str,
+        default="median",
+        help="str, processing mode, either of 'median', 'shean' or 'knuth'",
+    )
+    parser.add_argument(
         "-overwrite", dest="overwrite", action="store_true", help="If set, will overwrite already processed data"
     )
     parser.add_argument(
@@ -48,7 +55,7 @@ if __name__ == "__main__":
     # -- Load input data -- #
     baltoro_paths = files.get_data_paths("PK_Baltoro")
     ref_dem, all_outlines, roi_outlines, roi_mask, stable_mask = utils.load_ref_and_masks(baltoro_paths)
-    
+
     # Get list of all DEMs and set output directory
     if args.sat_type == "ASTER":
         dems_files = baltoro_paths["raw_data"]["aster_dems"]
@@ -60,18 +67,24 @@ if __name__ == "__main__":
     else:
         raise NotImplementedError
 
-    # -- Temporarily hard-coded parameters -- #
-    selection_opts = {"mode": "close", "dt": 365, "months": [8, 9, 10]}
-    merge_opts = {"mode": "median"}
-    outdir = os.path.join(baltoro_paths["processed_data"]['directory'], 'results_median')
-    downsampling = 1
-    
-    # selection_opts = {"mode": "subperiod", "dt": 365}
-    # downsampling = 10
-    # # merge_opts = {"mode": "shean"}
-    # # outdir = os.path.join(baltoro_paths["processed_data"]['directory'], 'results_shean')
-    # merge_opts = {"mode": "knuth"}
-    # outdir = os.path.join(baltoro_paths["processed_data"]['directory'], 'results_knuth')
+    # -- Select different processing modes -- #
+    if args.mode == 'median':
+        selection_opts = {"mode": "close", "dt": 365, "months": [8, 9, 10]}
+        merge_opts = {"mode": "median"}
+        outdir = os.path.join(baltoro_paths["processed_data"]['directory'], 'results_median')
+        downsampling = 1
+    elif args.mode == 'shean':
+        selection_opts = {"mode": "subperiod", "dt": 365}
+        downsampling = 10
+        merge_opts = {"mode": "shean"}
+        outdir = os.path.join(baltoro_paths["processed_data"]['directory'], 'results_shean')
+    elif args.mode == 'knuth':
+        selection_opts = {"mode": "subperiod", "dt": 365}
+        downsampling = 1
+        merge_opts = {"mode": "knuth"}
+        outdir = os.path.join(baltoro_paths["processed_data"]['directory'], 'results_knuth')
+    else:
+        raise ValueError("`mode` must be either of 'median', 'shean' or knuth'")
 
     # Create output directories
     if not os.path.exists(coreg_dir):
@@ -113,7 +126,7 @@ if __name__ == "__main__":
 
     # -- Merge DEMs by period -- #
     print("\n### Merge DEMs ###")
-    args.overwrite = True
+
     ddems = pproc.merge_and_calculate_ddems(groups_coreg, validation_dates, ref_dem, outdir=outdir, overwrite=args.overwrite, **merge_opts)
 
     # -- Plot -- #
