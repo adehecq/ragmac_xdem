@@ -20,7 +20,7 @@ def compute_mean_dh_error(
     nproc: int = 1,
 ) -> float:
     """
-    Function to calculate the error in elevation change averaged over the area in roi_mask, using
+    Function to calculate the 2-sigma uncertainty in elevation change averaged over the area in roi_mask, using
     error standardization and multi-nested variograms. See notebooks/uncertainty.ipynb for more details.
 
     :param dh: the elevation change raster
@@ -31,7 +31,7 @@ def compute_mean_dh_error(
     :param plot: set to True to display intermediate plots
     :param nproc: number of parallel processes to be used
 
-    :returns: the estimated average elevation change error
+    :returns: the estimated average elevation change 2-sigma uncertainty
     """
     if nranges not in [1, 2]:
         raise ValueError("`nranges` must be 1 or 2")
@@ -204,4 +204,4 @@ def compute_mean_dh_error(
     fac_dh_err = scale_fac_std * np.nanmean(dh_err[roi_mask])
     dh_mean_err = fac_dh_err / np.sqrt(neff)
 
-    return dh_mean_err
+    return 2 * dh_mean_err
