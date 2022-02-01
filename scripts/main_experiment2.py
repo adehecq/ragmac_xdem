@@ -129,7 +129,7 @@ if __name__ == "__main__":
     print("\n### Merge DEMs ###")
 
     ddems = pproc.merge_and_calculate_ddems(
-        groups_coreg, validation_dates, ref_dem, outdir=outdir, overwrite=args.overwrite, **merge_opts
+        groups_coreg, validation_dates, ref_dem, outdir=outdir, overwrite=args.overwrite, nproc=args.nproc, **merge_opts
     )
 
     # -- Plot -- #
