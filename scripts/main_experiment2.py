@@ -176,11 +176,11 @@ if __name__ == "__main__":
     for k, pair_id in enumerate(ddems):
 
         print(pair_id)
-        output_mb = mb.calculate_mb(ddems_filled[pair_id], roi_outlines)
+        output_mb = mb.calculate_mb(ddems_filled[pair_id], roi_outlines, stable_mask)
 
         # Print to screen the results for largest glacier
         largest = output_mb.sort_values(by="area").iloc[-1]
-        print(f"Glacier {largest.RGIId} - Volume change: {largest.dV:.1f} km3 - mean dh: {largest.dh_mean:.2f} +/- {largest.dh_mean_err:.2f} m")
+        print(f"Glacier {largest.RGIId} - Volume change: {largest.dV:.2f} +/- {largest.dV_err:.2f} km3 - mean dh: {largest.dh_mean:.2f} +/- {largest.dh_mean_err:.2f} m")
 
         # Add other inputs necessary for RAGMAC report
         output_mb["run_code"] = np.array(["CLT"], dtype='U4').repeat(len(output_mb))
