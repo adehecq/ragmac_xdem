@@ -8,6 +8,8 @@ import pandas as pd
 import xdem
 from geoutils.georaster import RasterType
 from scipy.interpolate import interp1d
+from tqdm import tqdm
+from ragmac_xdem import uncertainty as err
 
 
 def make_patch_spines_invisible(ax):
@@ -95,11 +97,9 @@ def fill_ddem(
     return filled_ddem
 
 
-def mass_balance_local_hypso(ddem, ref_dem, roi_mask, plot=True, outfig=None):
+def fill_ddem_local_hypso(ddem, ref_dem, roi_mask, plot=True, outfig=None):
     """
-    Function to calculate the MB by filling gaps using a local hypsometric approach.
-
-
+    Function to fill gaps in ddems using a local hypsometric approach.
     """
     # Calculate mean elevation change within elevation bins
     # TODO: filter pixels within each bins that are outliers
@@ -118,10 +118,6 @@ def mass_balance_local_hypso(ddem, ref_dem, roi_mask, plot=True, outfig=None):
     bins_area = xdem.volume.calculate_hypsometry_area(ddem_bins, ref_dem.data[roi_mask], pixel_size=ref_dem.res)
     obs_area = ddem_bins["count"] * ref_dem.res[0] * ref_dem.res[1]
     frac_obs = obs_area / bins_area
-
-    # Calculate total volume change and mean dh
-    dV = np.sum(ddem_bins_filled["value"].values * bins_area.values) / 1e9  # in km^3
-    dh_mean = dV * 1e9 / bins_area.sum()
 
     # Plot
     if plot:
@@ -178,4 +174,68 @@ def mass_balance_local_hypso(ddem, ref_dem, roi_mask, plot=True, outfig=None):
             plt.savefig(outfig, dpi=200)
             plt.close()
 
-    return ddem_bins, bins_area, frac_obs, dV, dh_mean
+    # Calculate total volume change and mean dh
+    # dV = np.sum(ddem_bins_filled["value"].values * bins_area.values) / 1e9  # in km^3
+    # dh_mean = dV * 1e9 / bins_area.sum()
+
+    return ddem_filled, ddem_bins
+
+
+def calculate_mb(ddem_filled, roi_outlines, stable_mask, plot=False):
+    """
+    Calculate mean elevation change and volume change for all features in roi_outlines, along with uncertainties.
+
+    Return a panda.DataFrame containing RGIId, area, dh_mean, dh_mean_err, dV, dV_err
+    """
+    # Calculate ddem NMAD in stable terrain, to be used for uncertainty calculation
+    nmad = xdem.spatialstats.nmad(ddem_filled.data[stable_mask])
+    
+    rgi_ids = roi_outlines.ds.RGIId
+    dh_means, dh_means_err, volumes, volumes_err, areas = [], [], [], [], []
+
+    for gid in tqdm(rgi_ids, desc="Looping through all glaciers"):
+
+        # Create mask for selected glacier
+        gl_outline = gu.Vector(roi_outlines.ds.loc[rgi_ids == gid])
+        gl_mask = gl_outline.create_mask(ddem_filled)
+
+        # Temporarily plot
+        if plot:
+            ddem_gl = ddem_filled.data.copy()
+            ddem_gl.mask[~gl_mask] = True
+
+            extent = (ddem_filled.bounds.left, ddem_filled.bounds.right, ddem_filled.bounds.bottom, ddem_filled.bounds.top)
+            ax = plt.subplot(111)
+            ax.imshow(ddem_gl.squeeze(), extent=extent, cmap="RdBu", vmin=-50, vmax=50)
+            gl_outline.ds.plot(ax=ax, facecolor='none', edgecolor='k')
+            plt.xlim(gl_outline.bounds.left, gl_outline.bounds.right)
+            plt.ylim(gl_outline.bounds.bottom, gl_outline.bounds.top)
+            plt.show()
+
+        # Extract all dh values within glacier, and check no gap exist
+        dh_subset = ddem_filled.data[gl_mask]
+        assert (np.sum(dh_subset.mask) == 0) or (np.sum(np.isfinite(dh_subset.data)) == 0), "ddem is not gap free"
+
+        # Calculate mean elevation change and volume change
+        dh_mean = np.mean(dh_subset)
+        # area = np.count_nonzero(gl_mask) * ddem_filled.res[0] * ddem_filled.res[1]
+        area = float(gl_outline.ds["Area"] * 1e6)
+        dV = dh_mean * area
+
+        # Calculate associated errors bars
+        dh_mean_err = err.err_500m_vario(nmad, area)  # err.compute_mean_dh_error(gl_mask, dh_err, vgm_params, res=ddem_filled.res[0])
+        dV_err = dh_mean_err * area
+
+        # Save to output lists
+        dh_means.append(dh_mean)
+        dh_means_err.append(dh_mean_err)
+        areas.append(area / 1e6)
+        volumes.append(dV / 1e9)
+        volumes_err.append(dV_err / 1e9)
+
+    out_df = pd.DataFrame(
+        data=np.vstack([rgi_ids, areas, dh_means, dh_means_err, volumes, volumes_err]).T,
+        columns=["RGIId", "area", "dh_mean", "dh_mean_err", "dV", "dV_err"]
+    )
+
+    return out_df

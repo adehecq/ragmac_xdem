@@ -17,7 +17,6 @@ import xdem
 import ragmac_xdem.dem_postprocessing as pproc
 from ragmac_xdem import files, utils
 from ragmac_xdem import mass_balance as mb
-from ragmac_xdem import uncertainty as err
 
 
 if __name__ == "__main__":
@@ -73,16 +72,19 @@ if __name__ == "__main__":
         merge_opts = {"mode": "median"}
         outdir = os.path.join(baltoro_paths["processed_data"]["directory"], "results_median")
         downsampling = 1
+        method = "DEMdiff"
     elif args.mode == "shean":
         selection_opts = {"mode": "subperiod", "dt": 365}
-        downsampling = 10
+        downsampling = 1
         merge_opts = {"mode": "shean"}
         outdir = os.path.join(baltoro_paths["processed_data"]["directory"], "results_shean")
+        method = "TimeSeries"
     elif args.mode == "knuth":
         selection_opts = {"mode": "subperiod", "dt": 365}
         downsampling = 1
         merge_opts = {"mode": "knuth"}
         outdir = os.path.join(baltoro_paths["processed_data"]["directory"], "results_knuth")
+        method = "TimeSeries2"
     else:
         raise ValueError("`mode` must be either of 'median', 'shean' or knuth'")
 
@@ -133,6 +135,9 @@ if __name__ == "__main__":
         groups_coreg, validation_dates, ref_dem, outdir=outdir, overwrite=args.overwrite, nproc=args.nproc, **merge_opts
     )
 
+    # Get first/last dates of the subperiods - needed for final report
+    start_date, end_date = utils.get_start_end_dates(groups, merge_opts["mode"], validation_dates)
+
     # -- Plot -- #
 
     # Number of subplots needed and figsize
@@ -153,17 +158,49 @@ if __name__ == "__main__":
     plt.savefig(fig_fn)
     # plt.show()
 
+
+    # -- Generate gap-free mosaics -- #
+    print("\n### Interpolate data gaps ###")
+    ddems_filled = {}
+    for k, pair_id in enumerate(ddems):
+
+        print(pair_id)
+        fig_fn = os.path.join(outdir, f"{pair_id}_mb_fig.png")
+        ddem_filled, ddem_bins = mb.fill_ddem_local_hypso(
+            ddems[pair_id], ref_dem, roi_mask, plot=True, outfig=fig_fn
+        )
+        ddems_filled[pair_id] = ddem_filled
+
     # -- Calculating MB -- #
     print("\n### Calculating mass balance ###")
     for k, pair_id in enumerate(ddems):
 
         print(pair_id)
-        fig_fn = os.path.join(outdir, f"{pair_id}_mb_fig.png")
-        ddem_bins, bins_area, frac_obs, dV, dh_mean = mb.mass_balance_local_hypso(
-            ddems[pair_id], ref_dem, roi_mask, plot=True, outfig=fig_fn
+        output_mb = mb.calculate_mb(ddems_filled[pair_id], roi_outlines, stable_mask)
+
+        # Print to screen the results for largest glacier
+        largest = output_mb.sort_values(by="area").iloc[-1]
+        print(f"Glacier {largest.RGIId} - Volume change: {largest.dV:.2f} +/- {largest.dV_err:.2f} km3 - mean dh: {largest.dh_mean:.2f} +/- {largest.dh_mean_err:.2f} m")
+
+        # Add other inputs necessary for RAGMAC report
+        output_mb["run_code"] = np.array(["CLT"], dtype='U4').repeat(len(output_mb))
+        output_mb["method"] = np.array([method,], dtype='U10').repeat(len(output_mb))
+
+        start_date_str = start_date[pair_id].strftime("%Y-%m-%d")
+        end_date_str = end_date[pair_id].strftime("%Y-%m-%d")
+        output_mb["start_date"] = start_date_str
+        output_mb["end_date"] = end_date_str
+
+        # Save to csv
+        ragmac_headers = ["glacier_id", "run_code", "S_km2", "start_date_yyyy-mm-dd", "end_date_yyyy-mm-dd", "method", "dh_m", "dh_sigma_m", "dV_km3", "dV_sigma_km3"]  # , "remarks"]
+        year1, year2 = pair_id.split("_")
+        results_file = os.path.join(outdir, f"xdem_PK_Baltoro_{year1}_{year2}_{method}_results.csv")
+
+        print(f"Saving results to file {results_file}\n")
+        output_mb.to_csv(
+            results_file,
+            columns=["RGIId", "run_code", "area", "start_date", "end_date", "method",
+                     "dh_mean", "dh_mean_err", "dV", "dV_err"],
+            index=False,
+            header=ragmac_headers
         )
-
-        # Calculate uncertainty
-        dh_mean_err = err.compute_mean_dh_error(ddems[pair_id], ref_dem, stable_mask, roi_mask, nproc=args.nproc)
-
-        print(f"Total volume: {dV:.1f} km3 - mean dh: {dh_mean:.2f} +/- {dh_mean_err:.2f} m")
