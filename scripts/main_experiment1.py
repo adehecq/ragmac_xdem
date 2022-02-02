@@ -36,6 +36,13 @@ if __name__ == "__main__":
         help="str, the satellite data to be used, either 'ASTER', 'TDX' or 'both'",
     )
     parser.add_argument(
+        "-mode",
+        dest="mode",
+        type=str,
+        default="median",
+        help="str, processing mode, either of 'median', 'shean' or 'knuth'",
+    ) 
+    parser.add_argument(
         "-overwrite", dest="overwrite", action="store_true", help="If set, will overwrite already processed data"
     )
     parser.add_argument(
@@ -55,22 +62,54 @@ if __name__ == "__main__":
     # Get list of all DEMs and set output directory
     if args.sat_type == "ASTER":
         dems_files = exp["raw_data"]["aster_dems"]
-        outdir = exp["processed_data"]["aster_dir"]
+        coreg_dir = exp["processed_data"]["aster_dir"]
 
     elif args.sat_type == "TDX":
         dems_files = exp["raw_data"]["tdx_dems"]
-        outdir = exp["processed_data"]["tdx_dir"]
+        coreg_dir = exp["processed_data"]["tdx_dir"]
     else:
         raise NotImplementedError
 
-    # Create directory
+    
+    
+    # from experiment2
+    # -- Select DEMs to be processed -- #
+    if args.mode == "median":
+        selection_opts = {"mode": "close", "dt": 365, "months": [8, 9, 10]}
+        merge_opts = {"mode":"median"}
+        outdir = os.path.join(exp["processed_data"]["directory"], "results_median")
+        downsampling = 1
+    elif args.mode == "shean":
+        selection_opts = {"mode": "subperiod", "dt": 365}
+        downsampling = 10
+        merge_opts = {"mode": "shean"}
+        outdir = os.path.join(exp["processed_data"]["directory"], "results_shean")
+    elif args.mode == "knuth":
+        selection_opts = {"mode": "subperiod", "dt": 365}
+        downsampling = 1
+        merge_opts = {"mode": "knuth"}
+        outdir = os.path.join(exp["processed_data"]["directory"], "results_knuth")
+    else:
+        raise ValueError("`mode` must be either of 'median','shean' or 'knuth'")
+
+    # create output directories
+    if not os.path.exists(coreg_dir):
+        os.makedirs(coreg_dir)
+    
     if not os.path.exists(outdir):
         os.makedirs(outdir)
+    
+    # -- Caluclate initial DEM statistics -- #
+    print("\n### Calculate initial statistics ###")
+    stats_file = os.path.join(coreg_dir, "init_stats.csv")
+    init_stats = pproc.calculate_init_stats_parallel(
+        dems_files, ref_dem, roi_outlines, all_outlines, stats_file, nthreads=args.nproc, overwrite=args.overwrite
+    )
+    print(f"Statistics file saved to {stats_file}")
 
-    # -- Select DEMs to be processed -- #
+          
     print("\n### DEMs selection ###")
     validation_dates = exp["validation_dates"]
-    selection_opts = {"mode": "temporal", "dt": 400, "months": [8, 9, 10]}
     groups = utils.dems_selection(dems_files, validation_dates=validation_dates, **selection_opts)
 
     # -- Postprocess DEMs i.e. coregister, filter etc -- #
@@ -87,41 +126,21 @@ if __name__ == "__main__":
         method="mp",
     )
     print(f"--> Coregistered DEMs saved in {outdir}")
+    
+    # Temporarily downsample DEM for speeding-up testing
+    if downsampling > 1:
+        ref_dem = ref_dem.reproject(dst_res = downsampling * ref_dem.res[0])
+        roi_mask = roi_outlines.create_mask(ref_dem)
+
 
     # -- Merge DEMs by period -- #
     print("\n### Merge DEMs ###")
+    ddems = pproc.merge_and_calculate_ddems(
+        groups_coreg, validation_dates, ref_dem, outdir=outdir, overwrite=args.overwrite, **merge_opts
+    )
+    
 
-    mosaics = {}
-    for date, group in zip(validation_dates, groups_coreg):
-        print(date)
-        if len(group) > 0:
-            mosaics[date] = {}
-            dem_objs = [xdem.DEM(dem_path, load_data=False) for dem_path in group]
-            with warnings.catch_warnings():
-                warnings.filterwarnings("ignore")
-                mosaic = gu.spatial_tools.merge_rasters(
-                    dem_objs, reference=ref_dem, merge_algorithm=np.nanmedian, use_ref_bounds=True
-                )
-            ddem = ref_dem - mosaic
-            cov, _, med, nmad = pproc.calculate_stats(ddem, roi_mask, stable_mask)
-            mosaics[date]["dem"] = mosaic
-            mosaics[date]["ddem"] = ddem
-            mosaics[date]["cov"] = cov
-            mosaics[date]["med"] = med
-            mosaics[date]["nmad"] = nmad
-
-    # -- Calculate elevation change for all periods -- #
-
-    print("\n### Calculate dDEMs for all subperiods ###")
-    ddems = {}
-    for k1 in range(len(validation_dates)):
-        for k2 in range(k1 + 1, len(validation_dates)):
-            date1 = validation_dates[k1]
-            date2 = validation_dates[k2]
-            if (date1 in mosaics.keys()) & (date2 in mosaics.keys()):
-                pair_id = f"{date1[:4]}_{date2[:4]}"  # year1_year2
-                print(pair_id)
-                ddems[pair_id] = mosaics[date2]["dem"] - mosaics[date1]["dem"]
+    
 
     # -- Plot -- #
 
