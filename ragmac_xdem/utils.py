@@ -275,6 +275,36 @@ def dems_selection(
         raise ValueError(f"Mode {mode} not recognized")
 
 
+def get_start_end_dates(groups, merge_mode, validation_dates):
+    """
+    Returns the first and last dates of the DEM subgroup used for each subperiod, depending on the merging method set.
+    """
+    # Figure out all possible ddem pairs and IDs
+    pair_indexes, pair_ids = list_pairs(validation_dates)
+
+    # Output dictionary
+    start_date = {}
+    end_date = {}
+
+    if merge_mode == "median":
+
+        for count, pair in enumerate(pair_indexes):
+            k1, k2 = pair
+            pair_id = pair_ids[count]
+            start_date[pair_id] = np.min(get_dems_date(groups[k1]))
+            end_date[pair_id] = np.max(get_dems_date(groups[k2]))
+
+    elif (merge_mode == "shean") or (merge_mode == "knuth"):
+
+        for count, pair in enumerate(pair_indexes):
+            k1, k2 = pair
+            pair_id = pair_ids[count]
+            start_date[pair_id] = np.min(get_dems_date(groups[k1]))
+            end_date[pair_id] = np.max(get_dems_date(groups[k1]))
+
+    return start_date, end_date
+
+
 def load_ref_and_masks(case_paths: dict) -> list:
     """
     Loads the reference xdem, outlines and masks of ROI and stable terrin, from the dictionary provided by files.get_data_paths.
