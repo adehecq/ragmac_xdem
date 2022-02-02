@@ -394,8 +394,10 @@ def linreg_predict(args):
     return prediction
 
 
-def linreg_predict_parallel(slope, X, intercept):
-    pool = mp.Pool(processes=psutil.cpu_count(logical=True))
+def linreg_predict_parallel(slope, X, intercept, cpu_count=None):
+    if not cpu_count:
+        cpu_count = mp.cpu_count() - 1
+    pool = mp.Pool(processes=cpu_count)
     args = [(slope, x, intercept) for x in X]
     results = pool.map(linreg_predict, tqdm(args))
     return np.ma.array(results)
@@ -411,8 +413,10 @@ def linreg_reshape_parallel_results(results, ma_stack, valid_mask_2D):
     return results_stack
 
 
-def linreg_run_parallel(X_train, ma_stack, method="Linear"):
-    pool = mp.Pool(processes=psutil.cpu_count(logical=True))
+def linreg_run_parallel(X_train, ma_stack, cpu_count=None, method="Linear"):
+    if not cpu_count:
+        cpu_count = mp.cpu_count() - 1
+    pool = mp.Pool(processes=cpu_count)
     args = [(X_train, ma_stack[:, i], method) for i in range(ma_stack.shape[1])]
     results = pool.map(linreg_run, tqdm(args))
     return np.array(results)
@@ -499,8 +503,10 @@ def GPR_run(args):
     return prediction
 
 
-def GPR_run_parallel(X_train, ma_stack, X, kernel):
-    pool = mp.Pool(processes=psutil.cpu_count(logical=True))
+def GPR_run_parallel(X_train, ma_stack, X, kernel, cpu_count=None):
+    if not cpu_count:
+        cpu_count = mp.cpu_count() - 1
+    pool = mp.Pool(processes=cpu_count)
     args = [(X_train, ma_stack[:, i], X, kernel) for i in range(ma_stack.shape[1])]
     results = pool.map(GPR_run, args)
     return np.array(results)

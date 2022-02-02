@@ -9,6 +9,7 @@ dependencies:
   - toml
   - pandas
   - xdem
+  - rioxarray
   - opencv
   - oggm
   - oggm-deps
