@@ -208,7 +208,7 @@ def ma_linreg(
                     with mp.Pool(processes=n_cpu) as pool:
                         results = list(
                             tqdm(
-                                pool.imap(
+                                pool.map(
                                     do_robust_linreg,
                                     [(date_list_o, y_orig[:, n], model) for n in range(y_orig.shape[1])],
                                     chunksize=1,
