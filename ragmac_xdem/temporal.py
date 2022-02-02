@@ -383,7 +383,7 @@ def linreg_run(args):
     X_train, y_train_masked_array, method = args
 
     X_train, y_train = remove_nan_from_training_data(X_train, y_train_masked_array)
-    slope, intercept = linreg_fit(X_train, y_train, method="Linear")
+    slope, intercept = linreg_fit(X_train, y_train, method=method)
 
     return slope, intercept
 
@@ -394,10 +394,11 @@ def linreg_predict(args):
     return prediction
 
 
-def linreg_predict_parallel(slope, X, intercept):
-    pool = mp.Pool(processes=psutil.cpu_count(logical=True))
-    args = [(slope, x, intercept) for x in X]
-    results = pool.map(linreg_predict, tqdm(args))
+def linreg_predict_parallel(slope, X, intercept, cpu_count=None):
+    if not cpu_count:
+        cpu_count = mp.cpu_count() - 1
+    pool = mp.Pool(processes=cpu_count)
+    results = pool.map(linreg_predict, tqdm([(slope, x, intercept) for x in X]))
     return np.ma.array(results)
 
 
@@ -411,10 +412,11 @@ def linreg_reshape_parallel_results(results, ma_stack, valid_mask_2D):
     return results_stack
 
 
-def linreg_run_parallel(X_train, ma_stack, method="Linear"):
-    pool = mp.Pool(processes=psutil.cpu_count(logical=True))
-    args = [(X_train, ma_stack[:, i], method) for i in range(ma_stack.shape[1])]
-    results = pool.map(linreg_run, tqdm(args))
+def linreg_run_parallel(X_train, ma_stack, cpu_count=None, method="TheilSen"):
+    if not cpu_count:
+        cpu_count = mp.cpu_count() - 1
+    pool = mp.Pool(processes=cpu_count)
+    results = pool.map(linreg_run, tqdm([(X_train, ma_stack[:, i], method) for i in range(ma_stack.shape[1])]))
     return np.array(results)
 
 
@@ -499,10 +501,11 @@ def GPR_run(args):
     return prediction
 
 
-def GPR_run_parallel(X_train, ma_stack, X, kernel):
-    pool = mp.Pool(processes=psutil.cpu_count(logical=True))
-    args = [(X_train, ma_stack[:, i], X, kernel) for i in range(ma_stack.shape[1])]
-    results = pool.map(GPR_run, args)
+def GPR_run_parallel(X_train, ma_stack, X, kernel, cpu_count=None):
+    if not cpu_count:
+        cpu_count = mp.cpu_count() - 1
+    pool = mp.Pool(processes=cpu_count)
+    results = pool.map(GPR_run, tqdm([(X_train, ma_stack[:, i], X, kernel) for i in range(ma_stack.shape[1])]))
     return np.array(results)
 
 

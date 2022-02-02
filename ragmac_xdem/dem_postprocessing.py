@@ -650,7 +650,7 @@ def merge_and_calculate_ddems(groups, validation_dates, ref_dem, mode, outdir, o
 
             # Then calculate linear fit
             print("\n### Run linear fit ###")
-            results = temporal.linreg_run_parallel(X_train, valid_data, method="TheilSen")
+            results = temporal.linreg_run_parallel(X_train, valid_data, cpu_count=nproc, method="TheilSen")
             results_stack = temporal.linreg_reshape_parallel_results(results, ma_stack, valid_mask_2D)
 
             slope = results_stack[0]
@@ -662,7 +662,7 @@ def merge_and_calculate_ddems(groups, validation_dates, ref_dem, mode, outdir, o
 
             # Not needed for now
             # print('\n### Compute residuals ###')
-            # prediction = temporal.linreg_predict_parallel(slope,X_train,intercept)
+            # prediction = temporal.linreg_predict_parallel(slope,X_train,intercept, cpu_count=nproc)
             # residuals  = ma_stack - prediction
             # residuals[:,valid_mask_2D]  = residuals[:,valid_mask_2D]
 
