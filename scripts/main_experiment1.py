@@ -16,6 +16,7 @@ import ragmac_xdem.dem_postprocessing as pproc
 from ragmac_xdem import files
 from ragmac_xdem import mass_balance as mb
 from ragmac_xdem import utils
+from ragmac_xdem import uncertainty as err
 
 if __name__ == "__main__":
 
@@ -171,4 +172,7 @@ if __name__ == "__main__":
         ddem_bins, bins_area, frac_obs, dV, dh_mean = mb.mass_balance_local_hypso(
             ddems[pair_id], ref_dem, roi_mask, plot=True, outfig=fig_fn
         )
-        print(f"Total volume: {dV:.1f} km3 - mean dh: {dh_mean:.2f} m")
+        dh_mean_err = err.compute_mean_dh_error(ddems[pair_id], ref_dem, stable_mask, roi_mask,
+            nproc=args.nproc)
+
+        print(f"Total volume: {dV:.1f} km3 - mean dh: {dh_mean:.2f} +/- {dh_mean_err:.2f} m")
