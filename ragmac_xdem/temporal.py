@@ -383,7 +383,7 @@ def linreg_run(args):
     X_train, y_train_masked_array, method = args
 
     X_train, y_train = remove_nan_from_training_data(X_train, y_train_masked_array)
-    slope, intercept = linreg_fit(X_train, y_train, method="Linear")
+    slope, intercept = linreg_fit(X_train, y_train, method=method)
 
     return slope, intercept
 
@@ -413,7 +413,7 @@ def linreg_reshape_parallel_results(results, ma_stack, valid_mask_2D):
     return results_stack
 
 
-def linreg_run_parallel(X_train, ma_stack, cpu_count=None, method="Linear"):
+def linreg_run_parallel(X_train, ma_stack, cpu_count=None, method="TheilSen"):
     if not cpu_count:
         cpu_count = mp.cpu_count() - 1
     pool = mp.Pool(processes=cpu_count)
