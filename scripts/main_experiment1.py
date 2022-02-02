@@ -42,7 +42,7 @@ if __name__ == "__main__":
         type=str,
         default="median",
         help="str, processing mode, either of 'median', 'shean' or 'knuth'",
-    ) 
+    )
     parser.add_argument(
         "-overwrite", dest="overwrite", action="store_true", help="If set, will overwrite already processed data"
     )
@@ -71,13 +71,10 @@ if __name__ == "__main__":
     else:
         raise NotImplementedError
 
-    
-    
-    # from experiment2
-    # -- Select DEMs to be processed -- #
+    # -- Select different processing modes -- #
     if args.mode == "median":
         selection_opts = {"mode": "close", "dt": 365, "months": [8, 9, 10]}
-        merge_opts = {"mode":"median"}
+        merge_opts = {"mode": "median"}
         outdir = os.path.join(exp["processed_data"]["directory"], "results_median")
         downsampling = 1
     elif args.mode == "shean":
@@ -96,10 +93,10 @@ if __name__ == "__main__":
     # create output directories
     if not os.path.exists(coreg_dir):
         os.makedirs(coreg_dir)
-    
+
     if not os.path.exists(outdir):
         os.makedirs(outdir)
-    
+
     # -- Caluclate initial DEM statistics -- #
     print("\n### Calculate initial statistics ###")
     stats_file = os.path.join(coreg_dir, "init_stats.csv")
@@ -108,7 +105,7 @@ if __name__ == "__main__":
     )
     print(f"Statistics file saved to {stats_file}")
 
-          
+    # -- Select DEMs to be processed -- #
     print("\n### DEMs selection ###")
     validation_dates = exp["validation_dates"]
     groups = utils.dems_selection(dems_files, validation_dates=validation_dates, **selection_opts)
@@ -120,28 +117,24 @@ if __name__ == "__main__":
         ref_dem,
         roi_outlines,
         all_outlines,
-        outdir,
+        coreg_dir,
         nthreads=args.nproc,
         overwrite=args.overwrite,
         plot=True,
         method="mp",
     )
     print(f"--> Coregistered DEMs saved in {outdir}")
-    
+
     # Temporarily downsample DEM for speeding-up testing
     if downsampling > 1:
-        ref_dem = ref_dem.reproject(dst_res = downsampling * ref_dem.res[0])
+        ref_dem = ref_dem.reproject(dst_res=downsampling * ref_dem.res[0])
         roi_mask = roi_outlines.create_mask(ref_dem)
-
 
     # -- Merge DEMs by period -- #
     print("\n### Merge DEMs ###")
     ddems = pproc.merge_and_calculate_ddems(
-        groups_coreg, validation_dates, ref_dem, outdir=outdir, overwrite=args.overwrite, **merge_opts
+        groups_coreg, validation_dates, ref_dem, outdir=outdir, overwrite=args.overwrite, nproc=args.nproc, **merge_opts
     )
-    
-
-    
 
     # -- Plot -- #
 
@@ -161,7 +154,7 @@ if __name__ == "__main__":
     plt.tight_layout()
     fig_fn = os.path.join(outdir, "ddem_fig.png")
     plt.savefig(fig_fn)
-    #plt.show()
+    # plt.show()
 
     # -- Calculating MB -- #
     print("\n### Calculating mass balance ###")
@@ -172,7 +165,6 @@ if __name__ == "__main__":
         ddem_bins, bins_area, frac_obs, dV, dh_mean = mb.mass_balance_local_hypso(
             ddems[pair_id], ref_dem, roi_mask, plot=True, outfig=fig_fn
         )
-        dh_mean_err = err.compute_mean_dh_error(ddems[pair_id], ref_dem, stable_mask, roi_mask,
-            nproc=args.nproc)
+        dh_mean_err = err.compute_mean_dh_error(ddems[pair_id], ref_dem, stable_mask, roi_mask, nproc=args.nproc)
 
         print(f"Total volume: {dV:.1f} km3 - mean dh: {dh_mean:.2f} +/- {dh_mean_err:.2f} m")
