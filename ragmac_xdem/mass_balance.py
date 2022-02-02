@@ -181,12 +181,15 @@ def fill_ddem_local_hypso(ddem, ref_dem, roi_mask, plot=True, outfig=None):
     return ddem_filled, ddem_bins
 
 
-def calculate_mb(ddem_filled, roi_outlines, plot=False):
+def calculate_mb(ddem_filled, roi_outlines, stable_mask, plot=False):
     """
     Calculate mean elevation change and volume change for all features in roi_outlines, along with uncertainties.
 
     Return a panda.DataFrame containing RGIId, area, dh_mean, dh_mean_err, dV, dV_err
     """
+    # Calculate ddem NMAD in stable terrain, to be used for uncertainty calculation
+    nmad = xdem.spatialstats.nmad(ddem_filled.data[stable_mask])
+    
     rgi_ids = roi_outlines.ds.RGIId
     dh_means, dh_means_err, volumes, volumes_err, areas = [], [], [], [], []
 
@@ -220,7 +223,7 @@ def calculate_mb(ddem_filled, roi_outlines, plot=False):
         dV = dh_mean * area
 
         # Calculate associated errors bars
-        dh_mean_err = 0  # err.compute_mean_dh_error(gl_mask, dh_err, vgm_params, res=ddem_filled.res[0])
+        dh_mean_err = err.err_500m_vario(nmad, area)  # err.compute_mean_dh_error(gl_mask, dh_err, vgm_params, res=ddem_filled.res[0])
         dV_err = dh_mean_err * area
 
         # Save to output lists
