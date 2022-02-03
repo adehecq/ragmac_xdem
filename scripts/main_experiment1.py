@@ -8,7 +8,9 @@ import os
 import warnings
 
 import geoutils as gu
+import matplotlib
 import matplotlib.pyplot as plt
+from mpl_toolkits.axes_grid1 import make_axes_locatable
 import numpy as np
 import xdem
 
@@ -162,9 +164,17 @@ if __name__ == "__main__":
 
         ax = plt.subplot(1, nsub, k + 1)
         roi_outlines.ds.plot(ax=ax, facecolor="none", edgecolor="k", zorder=2)
-        ddems[pair_id].show(ax=ax, cmap="coolwarm_r", vmin=-50, vmax=50, cb_title="Elevation change (m)", zorder=1)
+        ddems[pair_id].show(ax=ax, cmap="coolwarm_r", vmin=-50, vmax=50, add_cb=False, zorder=1)
         ax.set_title(pair_id)
-
+        
+        # adjust cbar to match plot extent
+        divider = make_axes_locatable(ax)
+        cax = divider.append_axes("right", size="5%", pad=0.05)
+        cmap = plt.cm.get_cmap("coolwarm_r")
+        norm = matplotlib.colors.Normalize(vmin=-50, vmax=50)
+        cbar = matplotlib.colorbar.ColorbarBase(cax, cmap="coolwarm_r", norm=norm)
+        cbar.set_label(label="Elevation change (m)")
+        
     plt.tight_layout()
     fig_fn = os.path.join(outdir, "ddem_fig.png")
     plt.savefig(fig_fn)
@@ -194,7 +204,7 @@ if __name__ == "__main__":
         print(f"Glacier {largest.RGIId} - Volume change: {largest.dV:.2f} +/- {largest.dV_err:.2f} km3 - mean dh: {largest.dh_mean:.2f} +/- {largest.dh_mean_err:.2f} m")
 
         # Add other inputs necessary for RAGMAC report
-        output_mb["run_code"] = np.array(["CLT"], dtype='U4').repeat(len(output_mb))
+        output_mb["run_code"] = np.array(["CTL"], dtype='U4').repeat(len(output_mb))
         output_mb["method"] = np.array([method,], dtype='U10').repeat(len(output_mb))
 
         start_date_str = start_date[pair_id].strftime("%Y-%m-%d")

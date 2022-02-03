@@ -2,7 +2,9 @@
 Functions to calculate a glacier mass balance.
 """
 import geoutils as gu
+import matplotlib
 import matplotlib.pyplot as plt
+from mpl_toolkits.axes_grid1 import make_axes_locatable
 import numpy as np
 import pandas as pd
 import xdem
@@ -163,7 +165,7 @@ def fill_ddem_local_hypso(ddem, ref_dem, roi_mask, roi_outlines, plot=True, outf
         pad = 2e3
         ax2 = plt.subplot(132)
         roi_outlines.ds.plot(ax=ax2, facecolor="none", edgecolor="k", zorder=2)
-        ddem.show(ax=ax2, cmap="coolwarm_r", vmin=-50, vmax=50, zorder=1)
+        ddem.show(ax=ax2, cmap="coolwarm_r", add_cb=False, vmin=-50, vmax=50, zorder=1)
         plt.xlim(bounds.left - pad, bounds.right + pad)
         plt.ylim(bounds.bottom - pad, bounds.top + pad)
         plt.title("dDEM before interpolation")
@@ -171,8 +173,19 @@ def fill_ddem_local_hypso(ddem, ref_dem, roi_mask, roi_outlines, plot=True, outf
         # ddem before interpolation
         ax3 = plt.subplot(133, sharex=ax2, sharey=ax2)
         roi_outlines.ds.plot(ax=ax3, facecolor="none", edgecolor="k", zorder=2)
-        ddem_filled.show(ax=ax3, cmap="coolwarm_r", vmin=-50, vmax=50, zorder=1)
+        ddem_filled.show(ax=ax3, cmap="coolwarm_r", add_cb=False, vmin=-50, vmax=50, zorder=1)
         plt.title("dDEM after interpolation")
+        
+
+        # adjust cbar to match plot extent
+        for ax in [ax2,ax3]:
+            divider = make_axes_locatable(ax)
+            cax = divider.append_axes("right", size="5%", pad=0.05)
+            cmap = plt.cm.get_cmap("coolwarm_r")
+            norm = matplotlib.colors.Normalize(vmin=-50, vmax=50)
+            cbar = matplotlib.colorbar.ColorbarBase(cax, cmap="coolwarm_r", norm=norm)
+            cbar.set_label(label="Elevation change (m)")
+        plt.tight_layout()
 
         if outfig is None:
             plt.show()
