@@ -172,7 +172,7 @@ def best_dem_cover(dem_path_list: list, init_stats: pd.Series) -> list[str, floa
     # Select highest ROI coverage
     best = stats_subset.sort_values(by="roi_cover_orig").iloc[-1]
 
-    return best.dem_path, best.roi_cover_orig
+    return best.dem_path, best.roi_cover_orig, best.dem_date
 
 
 def list_pairs(validation_dates):
@@ -263,8 +263,9 @@ def dems_selection(
         else:
             assert init_stats is not None, "`init_stats` must be provided for mode 'best'"
             final_dem_list = []
-            for group in output_list:
-                selected_dem, _ = best_dem_cover(group, init_stats)
+            for date, group in zip(validation_dates, output_list):
+                selected_dem, _, dem_date = best_dem_cover(group, init_stats)
+                print(f"For date {date}, selected DEM from date {dem_date}")
                 final_dem_list.append(
                     [
                         selected_dem,
