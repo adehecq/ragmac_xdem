@@ -68,7 +68,7 @@ if __name__ == "__main__":
 
     # -- Select different processing modes -- #
     if args.mode == "median":
-        selection_opts = {"mode": "close", "dt": 365, "months": [8, 9, 10]}
+        selection_opts = {"mode": "close", "dt": 400, "months": [8, 9, 10]}
         merge_opts = {"mode": "median"}
         outdir = os.path.join(baltoro_paths["processed_data"]["directory"], "results_median")
         downsampling = 1
@@ -175,7 +175,7 @@ if __name__ == "__main__":
         print(pair_id)
         fig_fn = os.path.join(outdir, f"{pair_id}_mb_fig.png")
         ddem_filled, ddem_bins = mb.fill_ddem_local_hypso(
-            ddems[pair_id], ref_dem, roi_mask, plot=True, outfig=fig_fn
+            ddems[pair_id], ref_dem, roi_mask, roi_outlines, plot=True, outfig=fig_fn
         )
         ddems_filled[pair_id] = ddem_filled
 
