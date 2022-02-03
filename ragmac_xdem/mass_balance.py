@@ -97,7 +97,7 @@ def fill_ddem(
     return filled_ddem
 
 
-def fill_ddem_local_hypso(ddem, ref_dem, roi_mask, plot=True, outfig=None):
+def fill_ddem_local_hypso(ddem, ref_dem, roi_mask, roi_outlines, plot=True, outfig=None):
     """
     Function to fill gaps in ddems using a local hypsometric approach.
     """
@@ -159,13 +159,19 @@ def fill_ddem_local_hypso(ddem, ref_dem, roi_mask, plot=True, outfig=None):
         ax3.tick_params(axis="x", colors=p3.patches[0].get_facecolor(), **tkw)
 
         # ddem before interpolation
+        bounds = roi_outlines.bounds
+        pad = 2e3
         ax2 = plt.subplot(132)
-        ddem.show(ax=ax2, cmap="coolwarm_r", vmin=-50, vmax=50)
+        roi_outlines.ds.plot(ax=ax2, facecolor="none", edgecolor="k", zorder=2)
+        ddem.show(ax=ax2, cmap="coolwarm_r", vmin=-50, vmax=50, zorder=1)
+        plt.xlim(bounds.left - pad, bounds.right + pad)
+        plt.ylim(bounds.bottom - pad, bounds.top + pad)
         plt.title("dDEM before interpolation")
 
         # ddem before interpolation
         ax3 = plt.subplot(133, sharex=ax2, sharey=ax2)
-        ddem_filled.show(ax=ax3, cmap="coolwarm_r", vmin=-50, vmax=50)
+        roi_outlines.ds.plot(ax=ax3, facecolor="none", edgecolor="k", zorder=2)
+        ddem_filled.show(ax=ax3, cmap="coolwarm_r", vmin=-50, vmax=50, zorder=1)
         plt.title("dDEM after interpolation")
 
         if outfig is None:

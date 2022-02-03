@@ -73,11 +73,17 @@ if __name__ == "__main__":
 
     # -- Select different processing modes -- #
     if args.mode == "median":
-        selection_opts = {"mode": "close", "dt": 365, "months": [8, 9, 10]}
+        selection_opts = {"mode": "close", "dt": 400, "months": [8, 9, 10]}
         merge_opts = {"mode": "median"}
         outdir = os.path.join(exp["processed_data"]["directory"], "results_median")
         downsampling = 1
-        method = "DEMdiff"
+        method = "DEMdiff_median"
+    elif args.mode == "best":
+        selection_opts = {"mode": "best", "dt": 400, "months": [8, 9, 10]}
+        merge_opts = {"mode": "median"}
+        outdir = os.path.join(exp["processed_data"]["directory"], "results_best")
+        downsampling = 1
+        method = "DEMdiff_best"
     elif args.mode == "shean":
         selection_opts = {"mode": "subperiod", "dt": 365}
         downsampling = 1
@@ -91,7 +97,7 @@ if __name__ == "__main__":
         outdir = os.path.join(exp["processed_data"]["directory"], "results_knuth")
         method = "TimeSeries2"
     else:
-        raise ValueError("`mode` must be either of 'median','shean' or 'knuth'")
+        raise ValueError("`mode` must be either of 'median', 'best', 'shean' or 'knuth'")
 
     # create output directories
     if not os.path.exists(coreg_dir):
@@ -111,6 +117,8 @@ if __name__ == "__main__":
     # -- Select DEMs to be processed -- #
     print("\n### DEMs selection ###")
     validation_dates = exp["validation_dates"]
+    if selection_opts["mode"] == 'best':
+        selection_opts["init_stats"] = init_stats
     groups = utils.dems_selection(dems_files, validation_dates=validation_dates, **selection_opts)
 
     # -- Postprocess DEMs i.e. coregister, filter etc -- #
@@ -126,7 +134,7 @@ if __name__ == "__main__":
         plot=True,
         method="mp",
     )
-    print(f"--> Coregistered DEMs saved in {outdir}")
+    print(f"--> Coregistered DEMs saved in {coreg_dir}")
 
     # Temporarily downsample DEM for speeding-up testing
     if downsampling > 1:
@@ -170,7 +178,7 @@ if __name__ == "__main__":
         print(pair_id)
         fig_fn = os.path.join(outdir, f"{pair_id}_mb_fig.png")
         ddem_filled, ddem_bins = mb.fill_ddem_local_hypso(
-            ddems[pair_id], ref_dem, roi_mask, plot=True, outfig=fig_fn
+            ddems[pair_id], ref_dem, roi_mask, roi_outlines, plot=True, outfig=fig_fn
         )
         ddems_filled[pair_id] = ddem_filled
 
