@@ -28,7 +28,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "region",
         type=str,
-        help="str, the region to run 'AT_Hintereisferner' or 'CH_Aletschgletscher'",
+        help="str, the region to run 'AT_Hintereisferner', 'CH_Aletschgletscher' or 'NO_Vestisen'",
     )
 
     parser.add_argument(
@@ -215,7 +215,7 @@ if __name__ == "__main__":
         # Save to csv
         ragmac_headers = ["glacier_id", "run_code", "S_km2", "start_date_yyyy-mm-dd", "end_date_yyyy-mm-dd", "method", "dh_m", "dh_sigma_m", "dV_km3", "dV_sigma_km3"]  # , "remarks"]
         year1, year2 = pair_id.split("_")
-        results_file = os.path.join(outdir, f"xdem_PK_Baltoro_{year1}_{year2}_{method}_results.csv")
+        results_file = os.path.join(outdir, f"xdem_{args.region}_{year1}_{year2}_{method}_results.csv")
 
         print(f"Saving results to file {results_file}\n")
         output_mb.to_csv(
