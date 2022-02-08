@@ -111,7 +111,41 @@ def load_mb_series(region: str) -> pd.Series:
 #         if count_errors == 0:
 #             print("=> ok")
 
+# def check_files():
 
+#     regions = ["CH_Aletschgletscher", 
+#                "AT_Hintereisferner", 
+#                "NO_Vestisen", 
+#                "PK_Baltoro", 
+#                "RU_FJL", 
+#                "CL_NPI"]
+    
+#     for region in regions:
+#         count_errors = 0
+#         print('\n'+region)
+#         exp = files.get_data_paths(region)
+
+#         for key in exp['raw_data'].keys():
+#             item = exp['raw_data'][key]
+#             if isinstance(item, type('')):
+#                 print(key,1)
+#                 if os.path.exists(item) or '*' in item:
+#                     pass
+#                 else:
+#                     print(f"Missing file {item}")
+#                     count_errors += 1
+
+#             elif isinstance(item, type(np.array([]))):
+#                 print(key,len(item))
+#                 for i in item:
+#                     if os.path.exists(i):
+#                         pass
+#                     else:
+#                         print(f"Missing file {i}")
+#                         count_errors += 1
+#         if count_errors == 0:
+#             print("=> ok")
+            
 if __name__ == "__main__":
     pass
     # check()

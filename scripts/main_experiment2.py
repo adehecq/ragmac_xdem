@@ -10,7 +10,9 @@ import os
 import warnings
 
 import geoutils as gu
+import matplotlib
 import matplotlib.pyplot as plt
+from mpl_toolkits.axes_grid1 import make_axes_locatable
 import numpy as np
 import xdem
 
@@ -23,7 +25,13 @@ if __name__ == "__main__":
 
     # -- Setup script arguments -- #
     parser = argparse.ArgumentParser(description="Process all the data and figures for experiment 2")
-
+    
+    parser.add_argument(
+        "region",
+        type=str,
+        help="str, the region to run 'CL_NPI', 'PK_Baltoro', or 'RU_FJL'",
+    )
+    
     parser.add_argument(
         "-sat",
         dest="sat_type",
@@ -52,17 +60,17 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # -- Load input data -- #
-    baltoro_paths = files.get_data_paths("PK_Baltoro")
-    ref_dem, all_outlines, roi_outlines, roi_mask, stable_mask = utils.load_ref_and_masks(baltoro_paths)
+    exp = files.get_data_paths(args.region)
+    ref_dem, all_outlines, roi_outlines, roi_mask, stable_mask = utils.load_ref_and_masks(exp)
 
     # Get list of all DEMs and set output directory
     if args.sat_type == "ASTER":
-        dems_files = baltoro_paths["raw_data"]["aster_dems"]
-        coreg_dir = baltoro_paths["processed_data"]["aster_dir"]
+        dems_files = exp["raw_data"]["aster_dems"]
+        coreg_dir = exp["processed_data"]["aster_dir"]
 
     elif args.sat_type == "TDX":
-        dems_files = baltoro_paths["raw_data"]["tdx_dems"]
-        coreg_dir = baltoro_paths["processed_data"]["tdx_dir"]
+        dems_files = exp["raw_data"]["tdx_dems"]
+        coreg_dir = exp["processed_data"]["tdx_dir"]
     else:
         raise NotImplementedError
 
@@ -70,26 +78,26 @@ if __name__ == "__main__":
     if args.mode == "median":
         selection_opts = {"mode": "close", "dt": 400, "months": [8, 9, 10]}
         merge_opts = {"mode": "median"}
-        outdir = os.path.join(baltoro_paths["processed_data"]["directory"], "results_median")
+        outdir = os.path.join(exp["processed_data"]["directory"], "results_median")
         downsampling = 1
         method = "DEMdiff_median"
     elif args.mode == "best":
         selection_opts = {"mode": "best", "dt": 400, "months": [8, 9, 10]}
         merge_opts = {"mode": "median"}
-        outdir = os.path.join(baltoro_paths["processed_data"]["directory"], "results_best")
+        outdir = os.path.join(exp["processed_data"]["directory"], "results_best")
         downsampling = 1
         method = "DEMdiff_best"
     elif args.mode == "shean":
         selection_opts = {"mode": "subperiod", "dt": 365}
         downsampling = 1
         merge_opts = {"mode": "shean"}
-        outdir = os.path.join(baltoro_paths["processed_data"]["directory"], "results_shean")
+        outdir = os.path.join(exp["processed_data"]["directory"], "results_shean")
         method = "TimeSeries"
     elif args.mode == "knuth":
         selection_opts = {"mode": "subperiod", "dt": 365}
         downsampling = 1
         merge_opts = {"mode": "knuth"}
-        outdir = os.path.join(baltoro_paths["processed_data"]["directory"], "results_knuth")
+        outdir = os.path.join(exp["processed_data"]["directory"], "results_knuth")
         method = "TimeSeries2"
     else:
         raise ValueError("`mode` must be either of 'median', 'shean' or knuth'")
@@ -111,7 +119,7 @@ if __name__ == "__main__":
 
     # -- Select DEMs to be processed -- #
     print("\n### DEMs selection ###")
-    validation_dates = baltoro_paths["validation_dates"]
+    validation_dates = exp["validation_dates"]
     if selection_opts["mode"] == 'best':
         selection_opts["init_stats"] = init_stats
     groups = utils.dems_selection(dems_files, validation_dates=validation_dates, **selection_opts)
@@ -158,9 +166,17 @@ if __name__ == "__main__":
 
         ax = plt.subplot(1, nsub, k + 1)
         roi_outlines.ds.plot(ax=ax, facecolor="none", edgecolor="k", zorder=2)
-        ddems[pair_id].show(ax=ax, cmap="coolwarm_r", vmin=-50, vmax=50, cb_title="Elevation change (m)", zorder=1)
+        ddems[pair_id].show(ax=ax, cmap="coolwarm_r", vmin=-50, vmax=50, add_cb=False, zorder=1)
         ax.set_title(pair_id)
-
+        
+        # adjust cbar to match plot extent
+        divider = make_axes_locatable(ax)
+        cax = divider.append_axes("right", size="5%", pad=0.05)
+        cmap = plt.cm.get_cmap("coolwarm_r")
+        norm = matplotlib.colors.Normalize(vmin=-50, vmax=50)
+        cbar = matplotlib.colorbar.ColorbarBase(cax, cmap="coolwarm_r", norm=norm)
+        cbar.set_label(label="Elevation change (m)")
+        
     plt.tight_layout()
     fig_fn = os.path.join(outdir, "ddem_fig.png")
     plt.savefig(fig_fn)
@@ -191,7 +207,7 @@ if __name__ == "__main__":
         print(f"Glacier {largest.RGIId} - Volume change: {largest.dV:.2f} +/- {largest.dV_err:.2f} km3 - mean dh: {largest.dh_mean:.2f} +/- {largest.dh_mean_err:.2f} m")
 
         # Add other inputs necessary for RAGMAC report
-        output_mb["run_code"] = np.array(["CLT"], dtype='U4').repeat(len(output_mb))
+        output_mb["run_code"] = np.array(["CTL"], dtype='U4').repeat(len(output_mb))
         output_mb["method"] = np.array([method,], dtype='U10').repeat(len(output_mb))
 
         start_date_str = start_date[pair_id].strftime("%Y-%m-%d")
@@ -202,7 +218,7 @@ if __name__ == "__main__":
         # Save to csv
         ragmac_headers = ["glacier_id", "run_code", "S_km2", "start_date_yyyy-mm-dd", "end_date_yyyy-mm-dd", "method", "dh_m", "dh_sigma_m", "dV_km3", "dV_sigma_km3"]  # , "remarks"]
         year1, year2 = pair_id.split("_")
-        results_file = os.path.join(outdir, f"xdem_PK_Baltoro_{year1}_{year2}_{method}_results.csv")
+        results_file = os.path.join(outdir, f"xdem_{args.region}_{year1}_{year2}_{method}_results.csv")
 
         print(f"Saving results to file {results_file}\n")
         output_mb.to_csv(

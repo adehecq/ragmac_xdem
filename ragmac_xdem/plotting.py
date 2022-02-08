@@ -239,7 +239,6 @@ def xr_plot_count_std_glacier(
     cmap = plt.cm.get_cmap(std_cmap)
     norm = matplotlib.colors.Normalize(vmin=std_vmin, vmax=std_vmax)
     cbar = matplotlib.colorbar.ColorbarBase(cax, cmap=cmap, norm=norm, extend="max", alpha=alpha)
-    cbar.set_alpha(alpha)  # not sure why this doesn't work....
     cbar.set_label(label="STD [m]", size=12)
     std_da.plot(ax=ax, cmap=cmap, add_colorbar=False, alpha=alpha, vmin=std_vmin, vmax=std_vmax)
 
