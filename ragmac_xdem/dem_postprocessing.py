@@ -301,6 +301,7 @@ def postprocessing_single(
     all_outlines: gu.Vector,
     out_dem_path: str,
     coreg_method: xdem.coreg | None = xdem.coreg.NuthKaab() + xdem.coreg.BiasCorr(bias_func=np.nanmedian),
+    filtering: bool = True,
     plot: bool = False,
     out_fig: str = None,
     verbose: bool = False,
@@ -315,6 +316,8 @@ def postprocessing_single(
     :param roi_outlines: The outlines of the glacier to study
     :param all_outlines: The outlines of all glaciers in the study area
     :param out_dem_path: Path where to save the coregistered DEM
+    :param coreg_method: The xdem coregistration method, or pipeline. If set to None, DEMs will be resampled to ref grid and optionally filtered, but not coregistered.
+    :param filtering: if set to True, final DEM will be filtered based on distance to ref, following the method of Hugonnet et al. (2021), equation S1.
     :param plot: Set to True to plot a figure of elevation diff before/after coregistration
     :param out_fig: Path to the output figure. If None will display to screen.
     :param verbose: set to True to print details on screen during coregistration.
@@ -355,10 +358,14 @@ def postprocessing_single(
     roi_coverage_coreg, nstable_coreg, med_coreg, nmad_coreg = calculate_stats(ddem_coreg, roi_mask, stable_mask)
 
     # Filter outliers based on reference DEM
-    outlier_mask = spatial_filter_ref_iter(
-        ref_dem.data.squeeze(), dem_coreg.data.squeeze(), res=ref_dem.res[0], plot=False
-    )
-    dem_coreg.data.mask[0, outlier_mask] = True
+    if filtering:
+        outlier_mask = spatial_filter_ref_iter(
+            ref_dem.data.squeeze(), dem_coreg.data.squeeze(), res=ref_dem.res[0], plot=False
+        )
+        nfiltered = len(np.where(outlier_mask & ~dem_coreg.data.mask)[0])
+        dem_coreg.data.mask[0, outlier_mask] = True
+    else:
+        nfiltered = 0
 
     # Save plots
     if plot:
@@ -402,6 +409,7 @@ def postprocessing_single(
         med_coreg,
         nmad_coreg,
         roi_coverage_coreg,
+        nfiltered
     )
 
 
@@ -412,6 +420,7 @@ def postprocessing_all(
     all_outlines,
     outdir,
     coreg_method: xdem.coreg | None = xdem.coreg.NuthKaab() + xdem.coreg.BiasCorr(bias_func=np.nanmedian),
+    filtering: bool = True,
     overwrite: bool = False,
     plot: bool = False,
     nthreads: int = 1,
@@ -462,7 +471,7 @@ def postprocessing_all(
         out_dem_path = os.path.join(outdir, os.path.basename(dem_path).replace(".tif", "_coreg.tif"))
         out_fig = out_dem_path.replace(".tif", "_diff.png")
         outputs = postprocessing_single(
-            dem_path, ref_dem, roi_outlines, all_outlines, out_dem_path, coreg_method=coreg_method, plot=plot, out_fig=out_fig
+            dem_path, ref_dem, roi_outlines, all_outlines, out_dem_path, coreg_method=coreg_method, filtering=filtering, plot=plot, out_fig=out_fig
         )
         return outputs
 
@@ -513,6 +522,7 @@ def postprocessing_all(
             "med_coreg",
             "nmad_coreg",
             "roi_cover_coreg",
+            "count_filtered_pixels",
         ],
     )
 
