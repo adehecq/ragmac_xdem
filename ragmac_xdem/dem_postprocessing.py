@@ -300,6 +300,7 @@ def postprocessing_single(
     roi_outlines: gu.Vector,
     all_outlines: gu.Vector,
     out_dem_path: str,
+    coreg_method: xdem.coreg | None = xdem.coreg.NuthKaab() + xdem.coreg.BiasCorr(bias_func=np.nanmedian),
     plot: bool = False,
     out_fig: str = None,
     verbose: bool = False,
@@ -342,9 +343,12 @@ def postprocessing_single(
 
     # Coregister to reference - Note: this will spread NaN
     # Better strategy: calculate shift, update transform, resample
-    coreg = xdem.coreg.NuthKaab() + xdem.coreg.BiasCorr(bias_func=np.nanmedian)
-    coreg.fit(ref_dem, dem, stable_mask, verbose=verbose)
-    dem_coreg = coreg.apply(dem, dilate_mask=False)
+    if isinstance(coreg_method, xdem.coreg.Coreg):
+        # coreg_method = xdem.coreg.NuthKaab() + xdem.coreg.BiasCorr(bias_func=np.nanmedian)
+        coreg_method.fit(ref_dem, dem, stable_mask, verbose=verbose)
+        dem_coreg = coreg_method.apply(dem, dilate_mask=False)
+    elif coreg_method is None:
+        dem_coreg = dem
     ddem_coreg = dem_coreg - ref_dem
 
     # Calculate new stats
@@ -407,10 +411,11 @@ def postprocessing_all(
     roi_outlines,
     all_outlines,
     outdir,
+    coreg_method: xdem.coreg | None = xdem.coreg.NuthKaab() + xdem.coreg.BiasCorr(bias_func=np.nanmedian),
     overwrite: bool = False,
     plot: bool = False,
     nthreads: int = 1,
-    method: str = "mp",
+    mp_method: str = "mp",
 ):
     """
     Run the postprocessing for all DEMs in dem_path_list.
@@ -418,9 +423,9 @@ def postprocessing_all(
 
     Return: pd.Series containing output stats, list of output files paths (same shape as dem_path_list)
     """
-    # Check that chosen method is correct
-    if not method in ["mp", "concurrent"]:
-        raise ValueError(f"method must be either 'mp' or 'concurrent', currently set to '{method}'")
+    # Check that chosen mp_method is correct
+    if not mp_method in ["mp", "concurrent"]:
+        raise ValueError(f"mp_method must be either 'mp' or 'concurrent', currently set to '{mp_method}'")
 
     # Create output directory
     if not os.path.exists(outdir):
@@ -457,7 +462,7 @@ def postprocessing_all(
         out_dem_path = os.path.join(outdir, os.path.basename(dem_path).replace(".tif", "_coreg.tif"))
         out_fig = out_dem_path.replace(".tif", "_diff.png")
         outputs = postprocessing_single(
-            dem_path, ref_dem, roi_outlines, all_outlines, out_dem_path, plot=plot, out_fig=out_fig
+            dem_path, ref_dem, roi_outlines, all_outlines, out_dem_path, coreg_method=coreg_method, plot=plot, out_fig=out_fig
         )
         return outputs
 
@@ -473,7 +478,7 @@ def postprocessing_all(
 
     elif nthreads > 1:
 
-        if method == "mp":
+        if mp_method == "mp":
             # Needed for MacOS with Python >= 3.8
             # See https://stackoverflow.com/questions/60518386/error-with-module-multiprocessing-under-python3-8
             cx = mp.get_context("fork")
@@ -482,7 +487,7 @@ def postprocessing_all(
                 pool.close()
                 pool.join()
 
-        elif method == "concurrent":
+        elif mp_method == "concurrent":
             with concurrent.futures.ThreadPoolExecutor(max_workers=nthreads) as executor:
                 results = list(tqdm(executor.map(_postproc_wrapper, dem_to_process), **pbar_kwargs))
 

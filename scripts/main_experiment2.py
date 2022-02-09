@@ -135,7 +135,7 @@ if __name__ == "__main__":
         nthreads=args.nproc,
         overwrite=args.overwrite,
         plot=True,
-        method="mp",
+        mp_method="mp",
     )
     print(f"--> Coregistered DEMs saved in {coreg_dir}")
 
