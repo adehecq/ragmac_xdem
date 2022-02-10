@@ -5,6 +5,7 @@ The main function to run the processing for a given experiment, case and run.
 """
 
 import os
+from time import time
 
 import matplotlib
 import matplotlib.pyplot as plt
@@ -40,6 +41,9 @@ def main(case: dict, mode: str, run_name: str, sat_type: str = "ASTER", nproc: i
     :param nproc: number of processes to be run in parallel whenever possible (Default is max CPU - 1)
     :param overwrite: If set to True, will overwrite already processed data
     """
+    # Record time
+    t1 = time()
+
     # -- Load input data -- #
     exp = files.get_data_paths(case)
     ref_dem, all_outlines, roi_outlines, roi_mask, stable_mask = utils.load_ref_and_masks(exp)
@@ -234,3 +238,7 @@ def main(case: dict, mode: str, run_name: str, sat_type: str = "ASTER", nproc: i
             index=False,
             header=ragmac_headers,
         )
+
+    # print time
+    t2 = time()
+    print(f"Took {(t2-t1)/60 min to process on {nproc} nodes")
