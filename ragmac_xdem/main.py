@@ -241,4 +241,4 @@ def main(case: dict, mode: str, run_name: str, sat_type: str = "ASTER", nproc: i
 
     # print time
     t2 = time()
-    print(f"Took {(t2-t1)/60 min to process on {nproc} nodes")
+    print(f"Took {(t2-t1)/60} min to process on {nproc} nodes")
