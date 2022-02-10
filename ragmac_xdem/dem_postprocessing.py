@@ -604,12 +604,12 @@ def merge_and_calculate_ddems(groups, validation_dates, ref_dem, mode, outdir, o
             results = temporal.ma_linreg(
                 dem_stack.data,
                 dem_dates,
-                n_thresh=3,
+                n_thresh=5,
                 model="theilsen",
                 parallel=True,
                 n_cpu=nproc,
                 dt_stack_ptp=None,
-                min_dt_ptp=None,
+                min_dt_ptp=5,
                 smooth=False,
                 rsq=False,
                 conf_test=False,
@@ -646,7 +646,7 @@ def merge_and_calculate_ddems(groups, validation_dates, ref_dem, mode, outdir, o
 
             print("\n### Prepare training data ###")
             X_train = np.ma.array([utils.date_time_to_decyear(i) for i in dem_dates]).data
-            valid_data, valid_mask_2D = temporal.mask_low_count_pixels(ma_stack, n_thresh=3)
+            valid_data, valid_mask_2D = temporal.mask_low_count_pixels(ma_stack, n_thresh=5)
 
             # Then calculate linear fit
             print("\n### Run linear fit ###")
