@@ -81,4 +81,7 @@ if __name__ == "__main__":
             for mode in all_modes:
 
                 print(f"\n\n##### Running case {case}, mode {mode} and run {run} #####\n\n")
-                main.main(case, mode, run, sat_type=args.sat_type, nproc=args.nproc, overwrite=args.overwrite)
+                try:
+                    main.main(case, mode, run, sat_type=args.sat_type, nproc=args.nproc, overwrite=args.overwrite)
+                except:
+                    print("ERROR -> skipping run")
