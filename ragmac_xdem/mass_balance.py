@@ -183,7 +183,7 @@ def fill_ddem_local_hypso(ddem, ref_dem, roi_mask, roi_outlines, plot=True, outf
             cax = divider.append_axes("right", size="5%", pad=0.05)
             cmap = plt.cm.get_cmap("coolwarm_r")
             norm = matplotlib.colors.Normalize(vmin=-50, vmax=50)
-            cbar = matplotlib.colorbar.ColorbarBase(cax, cmap="coolwarm_r", norm=norm)
+            cbar = matplotlib.colorbar.ColorbarBase(cax, cmap=cmap, norm=norm)
             cbar.set_label(label="Elevation change (m)")
         plt.tight_layout()
 

@@ -47,6 +47,13 @@ if __name__ == "__main__":
         help="str, processing mode, either of 'median', 'shean' or 'knuth'",
     )
     parser.add_argument(
+        "-run",
+        dest="run",
+        type=str,
+        default="CTL",
+        help="str, the run to be processed",
+    )
+    parser.add_argument(
         "-overwrite", dest="overwrite", action="store_true", help="If set, will overwrite already processed data"
     )
     parser.add_argument(
@@ -66,52 +73,59 @@ if __name__ == "__main__":
     # Get list of all DEMs and set output directory
     if args.sat_type == "ASTER":
         dems_files = exp["raw_data"]["aster_dems"]
-        coreg_dir = exp["processed_data"]["aster_dir"]
-
     elif args.sat_type == "TDX":
         dems_files = exp["raw_data"]["tdx_dems"]
-        coreg_dir = exp["processed_data"]["tdx_dir"]
     else:
         raise NotImplementedError
+
+    default_coreg = xdem.coreg.NuthKaab() + xdem.coreg.BiasCorr(bias_func=np.nanmedian)
+    process_dir = exp["processed_data"]["directory"]
+
+    runs = {
+        "CTL": {"coreg_method": default_coreg, "filtering": True, "coreg_dir": "coreg1_filter1"},
+        "NO-CO": {"coreg_method": None, "filtering": True, "coreg_dir": "coreg0_filter1"},
+        "NO-BIAS": {"coreg_method": xdem.coreg.NuthKaab(), "filtering": True, "coreg_dir": "coreg2_filter1"},
+        "NO-GAP": {"coreg_method": default_coreg, "filtering": True, "coreg_dir": "coreg1_filter1"},
+        "NO-FILT": {"coreg_method": default_coreg, "filtering": False, "coreg_dir": "coreg1_filter0"},
+    }
+    run = runs[args.run]
 
     # -- Select different processing modes -- #
     if args.mode == "median":
         selection_opts = {"mode": "close", "dt": 400, "months": [8, 9, 10]}
         merge_opts = {"mode": "median"}
-        outdir = os.path.join(exp["processed_data"]["directory"], "results_median")
-        downsampling = 1
         method = "DEMdiff_median"
+        downsampling = 1
     elif args.mode == "best":
         selection_opts = {"mode": "best", "dt": 400, "months": [8, 9, 10]}
         merge_opts = {"mode": "median"}
-        outdir = os.path.join(exp["processed_data"]["directory"], "results_best")
+        method = "DEMdiff_autoselect"
         downsampling = 1
-        method = "DEMdiff_best"
     elif args.mode == "shean":
         selection_opts = {"mode": "subperiod", "dt": 365}
         downsampling = 1
         merge_opts = {"mode": "shean"}
-        outdir = os.path.join(exp["processed_data"]["directory"], "results_shean")
         method = "TimeSeries"
     elif args.mode == "knuth":
         selection_opts = {"mode": "subperiod", "dt": 365}
         downsampling = 1
         merge_opts = {"mode": "knuth"}
-        outdir = os.path.join(exp["processed_data"]["directory"], "results_knuth")
         method = "TimeSeries2"
     else:
         raise ValueError("`mode` must be either of 'median', 'shean' or knuth'")
 
     # Create output directories
+    coreg_dir = os.path.join(process_dir, run["coreg_dir"])
     if not os.path.exists(coreg_dir):
         os.makedirs(coreg_dir)
 
+    outdir = os.path.join(process_dir, f"results_{args.run}_{method}")
     if not os.path.exists(outdir):
         os.makedirs(outdir)
 
     # -- Calculate initial DEM statistics -- #
     print("\n### Calculate initial statistics ###")
-    stats_file = os.path.join(coreg_dir, "init_stats.csv")
+    stats_file = os.path.join(process_dir, "init_stats.csv")
     init_stats = pproc.calculate_init_stats_parallel(
         dems_files, ref_dem, roi_outlines, all_outlines, stats_file, nthreads=args.nproc, overwrite=args.overwrite
     )
@@ -132,6 +146,8 @@ if __name__ == "__main__":
         roi_outlines,
         all_outlines,
         coreg_dir,
+        coreg_method=run["coreg_method"],
+        filtering=run["filtering"],
         nthreads=args.nproc,
         overwrite=args.overwrite,
         plot=True,
@@ -174,7 +190,7 @@ if __name__ == "__main__":
         cax = divider.append_axes("right", size="5%", pad=0.05)
         cmap = plt.cm.get_cmap("coolwarm_r")
         norm = matplotlib.colors.Normalize(vmin=-50, vmax=50)
-        cbar = matplotlib.colorbar.ColorbarBase(cax, cmap="coolwarm_r", norm=norm)
+        cbar = matplotlib.colorbar.ColorbarBase(cax, cmap=cmap, norm=norm)
         cbar.set_label(label="Elevation change (m)")
         
     plt.tight_layout()
