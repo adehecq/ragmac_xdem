@@ -22,11 +22,11 @@ from ragmac_xdem import utils
 default_coreg = xdem.coreg.NuthKaab() + xdem.coreg.BiasCorr(bias_func=np.nanmedian)
 
 runs = {
-    "CTL": {"coreg_method": default_coreg, "filtering": True, "coreg_dir": "coreg1_filter1"},
-    "NO-CO": {"coreg_method": None, "filtering": True, "coreg_dir": "coreg0_filter1"},
-    "NO-BIAS": {"coreg_method": xdem.coreg.NuthKaab(), "filtering": True, "coreg_dir": "coreg2_filter1"},
-    "NO-GAP": {"coreg_method": default_coreg, "filtering": True, "coreg_dir": "coreg1_filter1"},
-    "NO-FILT": {"coreg_method": default_coreg, "filtering": False, "coreg_dir": "coreg1_filter0"},
+    "CTL": {"coreg_method": default_coreg, "filtering": True, "coreg_dir": "coreg1_filter1", "gap_filling": True},
+    "NO-CO": {"coreg_method": None, "filtering": True, "coreg_dir": "coreg0_filter1", "gap_filling": True},
+    "NO-BIAS": {"coreg_method": xdem.coreg.NuthKaab(), "filtering": True, "coreg_dir": "coreg2_filter1", "gap_filling": True},
+    "NO-GAP": {"coreg_method": default_coreg, "filtering": True, "coreg_dir": "coreg1_filter1", "gap_filling": False},
+    "NO-FILT": {"coreg_method": default_coreg, "filtering": False, "coreg_dir": "coreg1_filter0", "gap_filling": True},
 }
 
 
@@ -172,10 +172,13 @@ def main(case: dict, mode: str, run_name: str, sat_type: str = "ASTER", nproc: i
 
         print(pair_id)
         fig_fn = os.path.join(outdir, f"{pair_id}_mb_fig.png")
-        ddem_filled, ddem_bins = mb.fill_ddem_local_hypso(
-            ddems[pair_id], ref_dem, roi_mask, roi_outlines, filtering=run["filtering"], plot=True, outfig=fig_fn
-        )
-        ddems_filled[pair_id] = ddem_filled
+        if run["gap_filling"]:
+            ddem_filled, ddem_bins = mb.fill_ddem_local_hypso(
+                ddems[pair_id], ref_dem, roi_mask, roi_outlines, filtering=run["filtering"], plot=True, outfig=fig_fn
+            )
+            ddems_filled[pair_id] = ddem_filled
+        else:
+            ddems_filled[pair_id] = ddems[pair_id]
 
     # -- Calculating MB -- #
     print("\n### Calculating mass balance ###")
@@ -237,6 +240,7 @@ def main(case: dict, mode: str, run_name: str, sat_type: str = "ASTER", nproc: i
             ],
             index=False,
             header=ragmac_headers,
+            na_rep='nan'
         )
 
     # print time
