@@ -33,7 +33,7 @@ if __name__ == "__main__":
         "-run",
         dest="run",
         type=str,
-        default=None,
+        default="CTL",
         help="str, the run to be processed (default is CTL)",
     )
     parser.add_argument(
