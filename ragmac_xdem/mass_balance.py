@@ -99,7 +99,7 @@ def fill_ddem(
     return filled_ddem
 
 
-def fill_ddem_local_hypso(ddem, ref_dem, roi_mask, roi_outlines, plot=True, outfig=None):
+def fill_ddem_local_hypso(ddem, ref_dem, roi_mask, roi_outlines, filtering=True, plot=True, outfig=None):
     """
     Function to fill gaps in ddems using a local hypsometric approach.
     """
@@ -108,7 +108,10 @@ def fill_ddem_local_hypso(ddem, ref_dem, roi_mask, roi_outlines, plot=True, outf
     ddem_bins = xdem.volume.hypsometric_binning(ddem.data[roi_mask], ref_dem.data[roi_mask])
 
     # Filter outliers in bins
-    ddem_bins_filtered = ddem_bins_filtering(ddem_bins, verbose=True)
+    if filtering:
+        ddem_bins_filtered = ddem_bins_filtering(ddem_bins, verbose=True)
+    else:
+        ddem_bins_filtered = ddem_bins.copy()
 
     # Interpolate missing bins
     ddem_bins_filled = xdem.volume.interpolate_hypsometric_bins(ddem_bins_filtered, method="linear")

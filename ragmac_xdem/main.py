@@ -173,7 +173,7 @@ def main(case: dict, mode: str, run_name: str, sat_type: str = "ASTER", nproc: i
         print(pair_id)
         fig_fn = os.path.join(outdir, f"{pair_id}_mb_fig.png")
         ddem_filled, ddem_bins = mb.fill_ddem_local_hypso(
-            ddems[pair_id], ref_dem, roi_mask, roi_outlines, plot=True, outfig=fig_fn
+            ddems[pair_id], ref_dem, roi_mask, roi_outlines, filtering=run["filtering"], plot=True, outfig=fig_fn
         )
         ddems_filled[pair_id] = ddem_filled
 
