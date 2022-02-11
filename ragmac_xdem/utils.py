@@ -196,11 +196,11 @@ def list_pairs(validation_dates):
 
 def dems_selection(
     dem_path_list: list[str],
+    init_stats: pd.Series,
     mode: str = None,
     validation_dates: list[str] = None,
     dt: float = -1,
     months: list[int] = np.arange(12) + 1,
-    init_stats: pd.Series = None,
 ) -> list[list[str]]:
     """
     Return a list of lists of DEMs path that fit the selection.
@@ -213,13 +213,16 @@ def dems_selection(
     If 'best' is set, 'init_stats' must be provided. Select DEMs based on the 'close' selection, but only returns a single DEM with the highest ROI coverage.
 
     :param dem_path_list: List containing path to all DEMs to be considered
+    :params init_stats: a pd.Series containing the statistics of all DEMs as returned by dem_postprocessing.calculate_init_stats_parallel.
     :param mode" Any of None, 'close', 'subperiod' or 'best'.
     :param validation_dates: List of validation dates for the experiment, dates expressed as 'yyyy-mm-dd'
     :param dt: Number of days allowed around each validation date
     :param months: A list of months to be selected (numbered 1 to 12). Default is all months.
-    :params init_stats: a pd.Series containing the statistics of all DEMs as returned by dem_postprocessing.calculate_init_stats_parallel.
     :returns: List containing lists of DEM paths for each validation date. Same length as validation dates, or as the number of possible pair combinations for mode 'subperiod'.
     """
+    # Remove DEMs with less than 1000 valid points, which may fail during coreg
+    dem_path_list = dem_path_list[init_stats["nstable_orig"] > 1e3]
+
     if mode is None:
         print(f"Found {len(dem_path_list)} DEMs")
         return [dem_path_list]

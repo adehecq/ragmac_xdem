@@ -101,9 +101,9 @@ def main(case: dict, mode: str, run_name: str, sat_type: str = "ASTER", nproc: i
     # -- Select DEMs to be processed -- #
     print("\n### DEMs selection ###")
     validation_dates = exp["validation_dates"]
-    if selection_opts["mode"] == "best":
-        selection_opts["init_stats"] = init_stats
-    groups = utils.dems_selection(dems_files, validation_dates=validation_dates, **selection_opts)
+    # if selection_opts["mode"] == "best":
+    #     selection_opts["init_stats"] = init_stats
+    groups = utils.dems_selection(dems_files, init_stats, validation_dates=validation_dates, **selection_opts)
 
     # -- Postprocess DEMs i.e. coregister, filter etc -- #
     print("\n### Coregister DEMs ###")
