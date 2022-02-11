@@ -194,7 +194,7 @@ def main(case: dict, mode: str, run_name: str, sat_type: str = "ASTER", nproc: i
         )
 
         # Add other inputs necessary for RAGMAC report
-        output_mb["run_code"] = np.array(["CTL"], dtype="U4").repeat(len(output_mb))
+        output_mb["run_code"] = np.array([run_name], dtype="U10").repeat(len(output_mb))
         output_mb["method"] = np.array(
             [
                 mode,
