@@ -1,6 +1,8 @@
 """
 Functions to calculate a glacier mass balance.
 """
+import warnings
+
 import geoutils as gu
 import matplotlib
 import matplotlib.pyplot as plt
@@ -211,7 +213,13 @@ def calculate_mb(ddem_filled, roi_outlines, stable_mask, plot=False):
     """
     # Calculate ddem NMAD in stable terrain, to be used for uncertainty calculation
     nmad = xdem.spatialstats.nmad(ddem_filled.data[stable_mask])
-    
+
+    # Raise warning if dDEM contains gaps in ROI area (is expected for NO-GAP run)
+    gl_mask = roi_outlines.create_mask(ddem_filled)
+    dh_subset = ddem_filled.data[gl_mask]
+    if (np.sum(dh_subset.mask) > 0) or (np.sum(~np.isfinite(dh_subset.data)) > 0):
+        warnings.warn("dDEM contains gaps in ROI - mean value will be biased")
+
     rgi_ids = roi_outlines.ds.RGIId
     dh_means, dh_means_err, volumes, volumes_err, areas = [], [], [], [], []
 
@@ -234,15 +242,19 @@ def calculate_mb(ddem_filled, roi_outlines, stable_mask, plot=False):
             plt.ylim(gl_outline.bounds.bottom, gl_outline.bounds.top)
             plt.show()
 
-        # Extract all dh values within glacier, and check no gap exist
+        # Extract all dh values within glacier and remove masked/nan values
         dh_subset = ddem_filled.data[gl_mask]
-        assert (np.sum(dh_subset.mask) == 0) or (np.sum(np.isfinite(dh_subset.data)) == 0), "ddem is not gap free"
+        if (np.sum(dh_subset.mask) > 0) or (np.sum(~np.isfinite(dh_subset.data)) > 0):
+            dh_subset = dh_subset.compressed()
+            dh_subset = dh_subset[np.isfinite(dh_subset)]
 
-        # Calculate mean elevation change and volume change
-        dh_mean = np.mean(dh_subset)
-        # area = np.count_nonzero(gl_mask) * ddem_filled.res[0] * ddem_filled.res[1]
-        area = float(gl_outline.ds["Area"] * 1e6)
-        dV = dh_mean * area
+        # Calculate mean elevation change and volume change, remove numpy warnings if empty array
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", category=RuntimeWarning)
+            dh_mean = np.mean(dh_subset)
+            # area = np.count_nonzero(gl_mask) * ddem_filled.res[0] * ddem_filled.res[1]
+            area = float(gl_outline.ds["Area"] * 1e6)
+            dV = dh_mean * area
 
         # Calculate associated errors bars
         dh_mean_err = err.err_500m_vario(nmad, area)  # err.compute_mean_dh_error(gl_mask, dh_err, vgm_params, res=ddem_filled.res[0])
