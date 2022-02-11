@@ -6,6 +6,7 @@ The main script to be run for experiment_2.
 
 import argparse
 import multiprocessing as mp
+import traceback
 
 from ragmac_xdem import main
 
@@ -85,3 +86,4 @@ if __name__ == "__main__":
                     main.main(case, mode, run, sat_type=args.sat_type, nproc=args.nproc, overwrite=args.overwrite)
                 except:
                     print("ERROR -> skipping run")
+                    traceback.print_exc()
