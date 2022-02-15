@@ -128,6 +128,12 @@ def fill_ddem_local_hypso(ddem, ref_dem, roi_mask, roi_outlines, filtering=True,
 
     # Plot
     if plot:
+        dh_mean = np.nanmean(ddem.data[roi_mask])
+        data, mask = gu.spatial_tools.get_array_and_mask(ddem)
+        nobs = np.sum(~mask[roi_mask.squeeze()])
+        ntot = np.sum(roi_mask)
+        roi_coverage = nobs / ntot
+    
         bin_width = ddem_bins.index.left - ddem_bins.index.right
 
         plt.figure(figsize=(18, 6))
@@ -145,7 +151,7 @@ def fill_ddem_local_hypso(ddem, ref_dem, roi_mask, roi_outlines, filtering=True,
         plt.xlabel("Elevation change (m)")
         plt.ylabel("Elevation (m)")
         plt.legend()
-
+        
         ax2 = ax1.twiny()
         p2 = plt.barh(y=ddem_bins.index.mid, width=bins_area / 1e6, height=bin_width, zorder=2, alpha=0.4)
         plt.xlabel("Glacier area per elevation bins (km\u00b2)")
@@ -156,7 +162,11 @@ def fill_ddem_local_hypso(ddem, ref_dem, roi_mask, roi_outlines, filtering=True,
         make_spine_invisible(ax3, "top")
         p3 = plt.barh(y=ddem_bins.index.mid, width=frac_obs, height=bin_width, zorder=2, alpha=0.4, color="gray")
         plt.xlabel("Fraction of observations")
-
+        ax1.annotate(r"ROI coverage = %.0f%%" % (roi_coverage * 100), xy=(0.02, 0.95), ha='left', xycoords='axes fraction',
+                     color='k', weight='bold', fontsize=9)
+        ax1.annotate(r"Mean dH = %.2f m" % (dh_mean), xy=(0.02, 0.90), ha='left', xycoords='axes fraction',
+                     color='k', weight='bold', fontsize=9)
+        
         plt.tight_layout()
 
         # Set ticks color
