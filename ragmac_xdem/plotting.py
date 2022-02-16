@@ -128,7 +128,7 @@ def plot_mb_fig(pair_id,
         legend_elements = [Line2D([0], [0], color='C0', label='Raw ddem bins'),
                            Line2D([0], [0], color='C1', linestyle=':', label='Filt + interp ddem bins'),
                            Patch(facecolor='C0', alpha=bin_alpha, label='Area per bin (km\u00b2)'),
-                           Patch(facecolor='gray', alpha=bin_alpha, label='Faction of obs')]
+                           Patch(facecolor='gray', alpha=bin_alpha, label='Fraction of obs')]
         
         legend = ax1.legend(handles=legend_elements, loc='best', edgecolor='black')
         legend.get_frame().set_alpha(None)
