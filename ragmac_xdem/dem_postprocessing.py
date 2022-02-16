@@ -474,7 +474,7 @@ def postprocessing_all(
             outputs = postprocessing_single(
                 dem_path, ref_dem, roi_outlines, all_outlines, out_dem_path, coreg_method=coreg_method, filtering=filtering, plot=plot, out_fig=out_fig
             )
-        except ValueError:
+        except (ValueError, AssertionError) as e:
             outputs = tuple([None]*11)
 
         return outputs
