@@ -7,6 +7,7 @@ from IPython.display import HTML
 from matplotlib import animation
 from matplotlib import pyplot as plt
 from matplotlib.lines import Line2D
+from matplotlib.patches import Patch
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 
 
@@ -40,56 +41,60 @@ def plot_mb_fig(pair_id,
                 dh_mean,
                 ddem,
                 ddem_filled,
-                outfig=None):
+                outfig=None,
+                bin_alpha=0.3):
     
         plt.figure(figsize=(18, 6))
 
         # Hypsometric curve
         ax1 = plt.subplot(131)
-        p1 = plt.plot(ddem_bins["value"], ddem_bins.index.mid, linestyle="-", zorder=2, label="Raw ddem bins")
+        p1 = plt.plot(ddem_bins["value"], ddem_bins.index.mid, linestyle="-", zorder=-1, color='C0')
         p1b = plt.plot(
             ddem_bins_filled["value"],
             ddem_bins.index.mid,
             linestyle=":",
-            zorder=3,
-            label="Filtered + interp ddem bins",
+            zorder=-1, color='C1',
         )
         plt.xlabel("Elevation change (m)")
         plt.ylabel("Elevation (m)")
-        plt.legend(loc="upper left")
         
         ax2 = ax1.twiny()
-        p2 = plt.barh(y=ddem_bins.index.mid, width=bins_area / 1e6, height=bin_width, zorder=1, alpha=0.4)
+        p2 = plt.barh(y=ddem_bins.index.mid, width=bins_area / 1e6, height=bin_width, zorder=1, alpha=bin_alpha, color='C0')
         plt.xlabel("Glacier area per elevation bins (km\u00b2)")
 
         ax3 = ax1.twiny()
         ax3.spines["top"].set_position(("axes", 1.1))
         make_patch_spines_invisible(ax3)
         make_spine_invisible(ax3, "top")
-        p3 = plt.barh(y=ddem_bins.index.mid, width=frac_obs, height=bin_width, zorder=1, alpha=0.4, color="gray")
+        p3 = plt.barh(y=ddem_bins.index.mid, width=frac_obs, height=bin_width, zorder=1, alpha=bin_alpha, color="gray")
         plt.xlabel("Fraction of observations")
-
+        
         plt.figtext(x=0.31,
                     y=0.99,
                     s= 'Period'+'\n'+\
-                       r"Mean dH" +'\n'+\
-                       r"ROI coverage", 
+                       r'Mean dH' +'\n'+\
+                       r'ROI coverage', 
                     va='top', ha='left',color='k', weight='bold', fontsize=12)
         
         plt.figtext(x=0.385,
                     y=0.99,
                     s= '= '+pair_id+'\n'+\
-                       r"= %.2f m" % (dh_mean)+'\n'+\
-                       r"= %.0f%%" % (roi_coverage * 100), 
+                       r'= %.2f m' % (dh_mean)+'\n'+\
+                       r'= %.0f%%' % (roi_coverage * 100), 
                     va='top', ha='left',color='k', weight='bold', fontsize=12)
         
         plt.tight_layout()
 
         # Set ticks color
         tkw = dict(size=4, width=1.5)
-        ax1.tick_params(axis="x", colors=p1[0].get_color(), **tkw)
-        ax2.tick_params(axis="x", colors=p2.patches[0].get_facecolor(), **tkw)
-        ax3.tick_params(axis="x", colors=p3.patches[0].get_facecolor(), **tkw)
+        ax1.tick_params(axis="x", colors='C0', **tkw)
+        c = list(p2.patches[0].get_facecolor())
+        c[3] = c[3]*2
+        ax2.tick_params(axis="x", colors=c, **tkw)
+        
+        c = list(p3.patches[0].get_facecolor())
+        c[3] = c[3]*2
+        ax3.tick_params(axis="x", colors=c, **tkw)
 
         # ddem before interpolation
         bounds = roi_outlines.bounds
@@ -101,6 +106,15 @@ def plot_mb_fig(pair_id,
         plt.ylim(bounds.bottom - pad, bounds.top + pad)
         plt.title("dDEM before interpolation")
 
+        legend_elements = [Line2D([0], [0], color='C0', label='Raw ddem bins'),
+                           Line2D([0], [0], color='C1', linestyle=':', label='Filt + interp ddem bins'),
+                           Patch(facecolor='C0', alpha=bin_alpha, label='Area per bin (km\u00b2)'),
+                           Patch(facecolor='gray', alpha=bin_alpha, label='Faction of obs')]
+        
+        legend = ax1.legend(handles=legend_elements, loc='upper left', edgecolor='black')
+        legend.get_frame().set_alpha(None)
+        legend.get_frame().set_facecolor((0, 0, 0, 0))
+        
         # ddem before interpolation
         ax3 = plt.subplot(133, sharex=ax2, sharey=ax2)
         roi_outlines.ds.plot(ax=ax3, facecolor="none", edgecolor="k", zorder=2)
