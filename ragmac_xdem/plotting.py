@@ -42,27 +42,45 @@ def plot_mb_fig(pair_id,
                 ddem,
                 ddem_filled,
                 outfig=None,
-                bin_alpha=0.3,
                 output_mb = None,
-                init_stats = None):
+                init_stats = None,
+                bin_alpha=0.3,
+                line_width=3,
+                dh_spread_map=30,
+                dh_spread_curve=40):
     
         plt.figure(figsize=(18, 6))
 
         # Hypsometric curve
         ax1 = plt.subplot(131)
-        p1 = plt.plot(ddem_bins["value"], ddem_bins.index.mid, linestyle="-", zorder=-1, color='C0')
+        
+        p1 = plt.plot(ddem_bins["value"], 
+                      ddem_bins.index.mid, 
+                      linestyle="-", 
+                      zorder=1,
+                      linewidth=line_width,
+                      color='C0')
+        
         p1b = plt.plot(
             ddem_bins_filled["value"],
             ddem_bins.index.mid,
             linestyle=":",
-            zorder=-1, color='C1',
+            linewidth=line_width,
+            zorder=2, color='C1',
         )
+        
         plt.xlabel("Elevation change (m)")
         plt.ylabel("Elevation (m)")
-        ax1.set_xlim(-40,40)
+        
+        ax1.set_xlim(-dh_spread_curve,dh_spread_curve)
         
         ax2 = ax1.twiny()
-        p2 = plt.barh(y=ddem_bins.index.mid, width=bins_area / 1e6, height=bin_width, zorder=1, alpha=bin_alpha, color='C0')
+        p2 = plt.barh(y=ddem_bins.index.mid, 
+                      width=bins_area / 1e6, 
+                      height=bin_width, 
+                      zorder=-1, 
+                      alpha=bin_alpha, 
+                      color='C0')
         
         plt.xlabel("Glacier area per elevation bins (km\u00b2)")
 
@@ -70,30 +88,73 @@ def plot_mb_fig(pair_id,
         ax3.spines["top"].set_position(("axes", 1.1))
         make_patch_spines_invisible(ax3)
         make_spine_invisible(ax3, "top")
-        p3 = plt.barh(y=ddem_bins.index.mid, width=frac_obs, height=bin_width, zorder=1, alpha=bin_alpha, color="gray")
+        p3 = plt.barh(y=ddem_bins.index.mid, 
+                      width=frac_obs, 
+                      height=bin_width, 
+                      zorder=-2, 
+                      alpha=bin_alpha, 
+                      color="gray")
         plt.xlabel("Fraction of observations")
         
+        # Set custom legend
+        legend_elements = [Line2D([0], [0], 
+                                  color='C0', 
+                                  linewidth=line_width,
+                                  label='Raw ddem bins'),
+                           Line2D([0], [0], 
+                                  color='C1', 
+                                  linestyle=':',
+                                  linewidth=line_width,
+                                  label='Filt + interp ddem bins'),
+                           Patch(facecolor='C0', 
+                                 alpha=bin_alpha, 
+                                 label='Area per bin (km\u00b2)'),
+                           Patch(facecolor='gray', 
+                                 alpha=bin_alpha, 
+                                 label='Fraction of obs')]
+        
+        legend = ax1.legend(handles=legend_elements, 
+                            loc='best', 
+                            edgecolor='black')
+        legend.get_frame().set_alpha(None)
+        legend.get_frame().set_facecolor((0, 0, 0, 0))
+        
+        
+        # Annotate with stats
         if not isinstance(output_mb, type(None)) & isinstance(init_stats, type(None)):
             plt.figtext(x=0.41,
                         y=0.99,
                         s= 'Period'+'\n'+\
                            r'Mean dH' +'\n'+\
                            r'ROI coverage', 
-                        va='top', ha='left',color='k', weight='bold', fontsize=12)
+                        va='top', 
+                        ha='left',
+                        color='k', 
+                        weight='bold', 
+                        fontsize=12)
             plt.figtext(x=0.485,
                         y=0.99,
                         s= '= '+pair_id+'\n'+\
-                           r'= %.2f m'%(output_mb['dh_mean'].mean())+' +/- '+r'%.2f m'%(output_mb['dh_mean_err'].mean())+'\n'+\
+                           r'= %.2f m'%(output_mb['dh_mean'].mean())+\
+                           ' +/- '+r'%.2f m'%(output_mb['dh_mean_err'].mean())+'\n'+\
                            r'= %.0f%%'%(init_stats['roi_cover_orig'].sum()), 
-                        va='top', ha='left',color='k', weight='bold', fontsize=12)
+                        va='top', 
+                        ha='left',
+                        color='k', 
+                        weight='bold', 
+                        fontsize=12)
         
         else:
             plt.figtext(x=0.31,
-                    y=0.99,
-                    s= 'Period'+'\n'+\
-                       r'Mean dH' +'\n'+\
-                       r'ROI coverage', 
-                    va='top', ha='left',color='k', weight='bold', fontsize=12)
+                        y=0.99,
+                        s= 'Period'+'\n'+\
+                           r'Mean dH' +'\n'+\
+                           r'ROI coverage', 
+                        va='top', 
+                        ha='left',
+                        color='k', 
+                        weight='bold', 
+                        fontsize=12)
         
             plt.figtext(x=0.385,
                         y=0.99,
@@ -120,24 +181,21 @@ def plot_mb_fig(pair_id,
         pad = 2e3
         ax2 = plt.subplot(132)
         roi_outlines.ds.plot(ax=ax2, facecolor="none", edgecolor="k", zorder=2)
-        ddem.show(ax=ax2, cmap="coolwarm_r", add_cb=False, vmin=-50, vmax=50, zorder=1)
+        ddem.show(ax=ax2, cmap="coolwarm_r", 
+                  add_cb=False, vmin=-dh_spread_map, vmax=dh_spread_map, zorder=1)
         plt.xlim(bounds.left - pad, bounds.right + pad)
         plt.ylim(bounds.bottom - pad, bounds.top + pad)
         plt.title("dDEM before interpolation")
-
-        legend_elements = [Line2D([0], [0], color='C0', label='Raw ddem bins'),
-                           Line2D([0], [0], color='C1', linestyle=':', label='Filt + interp ddem bins'),
-                           Patch(facecolor='C0', alpha=bin_alpha, label='Area per bin (km\u00b2)'),
-                           Patch(facecolor='gray', alpha=bin_alpha, label='Fraction of obs')]
         
-        legend = ax1.legend(handles=legend_elements, loc='best', edgecolor='black')
-        legend.get_frame().set_alpha(None)
-        legend.get_frame().set_facecolor((0, 0, 0, 0))
-        
-        # ddem before interpolation
+        # ddem after interpolation
         ax3 = plt.subplot(133, sharex=ax2, sharey=ax2)
         roi_outlines.ds.plot(ax=ax3, facecolor="none", edgecolor="k", zorder=2)
-        ddem_filled.show(ax=ax3, cmap="coolwarm_r", add_cb=False, vmin=-50, vmax=50, zorder=1)
+        ddem_filled.show(ax=ax3, 
+                         cmap="coolwarm_r", 
+                         add_cb=False, 
+                         vmin=-dh_spread_map, 
+                         vmax=dh_spread_map, 
+                         zorder=1)
         plt.title("dDEM after interpolation")
         
 
@@ -146,7 +204,7 @@ def plot_mb_fig(pair_id,
             divider = make_axes_locatable(ax)
             cax = divider.append_axes("right", size="5%", pad=0.05)
             cmap = plt.cm.get_cmap("coolwarm_r")
-            norm = matplotlib.colors.Normalize(vmin=-50, vmax=50)
+            norm = matplotlib.colors.Normalize(vmin=-dh_spread_map, vmax=dh_spread_map)
             cbar = matplotlib.colorbar.ColorbarBase(cax, cmap=cmap, norm=norm)
             cbar.set_label(label="Elevation change (m)")
         plt.tight_layout()
