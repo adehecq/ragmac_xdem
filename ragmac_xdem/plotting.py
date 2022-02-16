@@ -57,9 +57,11 @@ def plot_mb_fig(pair_id,
         )
         plt.xlabel("Elevation change (m)")
         plt.ylabel("Elevation (m)")
+        ax1.set_xlim(-40,40)
         
         ax2 = ax1.twiny()
         p2 = plt.barh(y=ddem_bins.index.mid, width=bins_area / 1e6, height=bin_width, zorder=1, alpha=bin_alpha, color='C0')
+        
         plt.xlabel("Glacier area per elevation bins (km\u00b2)")
 
         ax3 = ax1.twiny()
@@ -111,7 +113,7 @@ def plot_mb_fig(pair_id,
                            Patch(facecolor='C0', alpha=bin_alpha, label='Area per bin (km\u00b2)'),
                            Patch(facecolor='gray', alpha=bin_alpha, label='Faction of obs')]
         
-        legend = ax1.legend(handles=legend_elements, loc='upper left', edgecolor='black')
+        legend = ax1.legend(handles=legend_elements, loc='best', edgecolor='black')
         legend.get_frame().set_alpha(None)
         legend.get_frame().set_facecolor((0, 0, 0, 0))
         

@@ -166,11 +166,16 @@ def main(case: dict, mode: str, run_name: str, sat_type: str = "ASTER", nproc: i
     # plt.show()
 
     # -- Generate gap-free mosaics -- #
-    print("\n### Interpolate data gaps ###")
+    if run["gap_filling"]:
+        print("\n### Interpolate data gaps and calculate mass balance ###")
+    else:
+        print("\n### Calculate mass balance ###")
+    
     ddems_filled = {}
     for k, pair_id in enumerate(ddems):
-
         print(pair_id)
+
+        # -- Interpolate -- #
         fig_fn = os.path.join(outdir, f"{pair_id}_mb_fig.png")
         if run["gap_filling"]:
             ddem_filled, ddem_bins = mb.fill_ddem_local_hypso(
@@ -180,11 +185,8 @@ def main(case: dict, mode: str, run_name: str, sat_type: str = "ASTER", nproc: i
         else:
             ddems_filled[pair_id] = ddems[pair_id]
 
-    # -- Calculating MB -- #
-    print("\n### Calculating mass balance ###")
-    for k, pair_id in enumerate(ddems):
-
-        print(pair_id)
+        
+        # -- Calculating MB -- #
         output_mb = mb.calculate_mb(ddems_filled[pair_id], roi_outlines, stable_mask)
 
         # Print to screen the results for largest glacier
