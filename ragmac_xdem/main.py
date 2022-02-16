@@ -10,6 +10,7 @@ from time import time
 import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
+import geoutils as gu
 import xdem
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 
@@ -17,6 +18,7 @@ import ragmac_xdem.dem_postprocessing as pproc
 from ragmac_xdem import files
 from ragmac_xdem import mass_balance as mb
 from ragmac_xdem import utils
+from ragmac_xdem import plotting
 
 # Set parameters for the different runs to be processed
 default_coreg = xdem.coreg.NuthKaab() + xdem.coreg.BiasCorr(bias_func=np.nanmedian)
@@ -176,18 +178,50 @@ def main(case: dict, mode: str, run_name: str, sat_type: str = "ASTER", nproc: i
         print(pair_id)
 
         # -- Interpolate -- #
-        fig_fn = os.path.join(outdir, f"{pair_id}_mb_fig.png")
+        
         if run["gap_filling"]:
-            ddem_filled, ddem_bins = mb.fill_ddem_local_hypso(
-                pair_id, ddems, ref_dem, roi_mask, roi_outlines, filtering=run["filtering"], plot=True, outfig=fig_fn
-            )
+            ddem_filled, ddem_bins, ddem_bins_filled = mb.fill_ddem_local_hypso(ddems[pair_id], 
+                                                                                  ref_dem, 
+                                                                                  roi_mask, 
+                                                                                  roi_outlines, 
+                                                                                  filtering=run["filtering"])
             ddems_filled[pair_id] = ddem_filled
         else:
             ddems_filled[pair_id] = ddems[pair_id]
-
         
         # -- Calculating MB -- #
         output_mb = mb.calculate_mb(ddems_filled[pair_id], roi_outlines, stable_mask)
+        
+        # Plot
+        if run["gap_filling"]:
+            fig_fn = os.path.join(outdir, f"{pair_id}_mb_fig.png")
+
+            bins_area = xdem.volume.calculate_hypsometry_area(ddem_bins, ref_dem.data[roi_mask], pixel_size=ref_dem.res)
+            obs_area = ddem_bins["count"] * ref_dem.res[0] * ref_dem.res[1]
+            frac_obs = obs_area / bins_area
+
+            dh_mean = np.nanmean(ddems[pair_id].data[roi_mask])
+            data, mask = gu.spatial_tools.get_array_and_mask(ddems[pair_id])
+            nobs = np.sum(~mask[roi_mask.squeeze()])
+            ntot = np.sum(roi_mask)
+            roi_coverage = nobs / ntot
+            bin_width = ddem_bins.index.left - ddem_bins.index.right
+
+            plotting.plot_mb_fig(pair_id,
+                                 ddem_bins, 
+                                 ddem_bins_filled, 
+                                 bins_area,
+                                 bin_width,
+                                 frac_obs,
+                                 roi_coverage,
+                                 roi_outlines,
+                                 dh_mean,
+                                 ddems[pair_id],
+                                 ddem_filled,
+                                 outfig=fig_fn,
+                                 output_mb = output_mb,
+                                 init_stats = init_stats)
+
 
         # Print to screen the results for largest glacier
         largest = output_mb.sort_values(by="area").iloc[-1]

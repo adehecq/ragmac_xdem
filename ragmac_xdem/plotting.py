@@ -42,7 +42,9 @@ def plot_mb_fig(pair_id,
                 ddem,
                 ddem_filled,
                 outfig=None,
-                bin_alpha=0.3):
+                bin_alpha=0.3,
+                output_mb = None,
+                init_stats = None):
     
         plt.figure(figsize=(18, 6))
 
@@ -71,19 +73,34 @@ def plot_mb_fig(pair_id,
         p3 = plt.barh(y=ddem_bins.index.mid, width=frac_obs, height=bin_width, zorder=1, alpha=bin_alpha, color="gray")
         plt.xlabel("Fraction of observations")
         
-        plt.figtext(x=0.31,
+        if not isinstance(output_mb, type(None)) & isinstance(init_stats, type(None)):
+            plt.figtext(x=0.31,
+                        y=0.99,
+                        s= 'Period'+'\n'+\
+                           r'Mean dH' +'\n'+\
+                           r'ROI coverage', 
+                        va='top', ha='left',color='k', weight='bold', fontsize=12)
+            plt.figtext(x=0.385,
+                        y=0.99,
+                        s= '= '+pair_id+'\n'+\
+                           r'= %.2f m'%(output_mb['dh_mean'].mean())+' +/- '+r'%.2f m'%(output_mb['dh_mean_err'].mean())+'\n'+\
+                           r'= %.0f%%'%(init_stats['roi_cover_orig'].sum()), 
+                        va='top', ha='left',color='k', weight='bold', fontsize=12)
+        
+        else:
+            plt.figtext(x=0.31,
                     y=0.99,
                     s= 'Period'+'\n'+\
                        r'Mean dH' +'\n'+\
                        r'ROI coverage', 
                     va='top', ha='left',color='k', weight='bold', fontsize=12)
         
-        plt.figtext(x=0.385,
-                    y=0.99,
-                    s= '= '+pair_id+'\n'+\
-                       r'= %.2f m' % (dh_mean)+'\n'+\
-                       r'= %.0f%%' % (roi_coverage * 100), 
-                    va='top', ha='left',color='k', weight='bold', fontsize=12)
+            plt.figtext(x=0.385,
+                        y=0.99,
+                        s= '= '+pair_id+'\n'+\
+                           r'= %.2f m' % (dh_mean)+'\n'+\
+                           r'= %.0f%%' % (roi_coverage * 100), 
+                        va='top', ha='left',color='k', weight='bold', fontsize=12)
         
         plt.tight_layout()
 

@@ -83,13 +83,12 @@ def fill_ddem(
     return filled_ddem
 
 
-def fill_ddem_local_hypso(pair_id, ddems, ref_dem, roi_mask, roi_outlines, filtering=True, plot=True, outfig=None):
+def fill_ddem_local_hypso(ddem, ref_dem, roi_mask, roi_outlines, filtering=True):
     """
     Function to fill gaps in ddems using a local hypsometric approach.
     """
     # Calculate mean elevation change within elevation bins
     # TODO: filter pixels within each bins that are outliers
-    ddem = ddems[pair_id]
     ddem_bins = xdem.volume.hypsometric_binning(ddem.data[roi_mask], ref_dem.data[roi_mask])
 
     # Filter outliers in bins
@@ -105,37 +104,15 @@ def fill_ddem_local_hypso(pair_id, ddems, ref_dem, roi_mask, roi_outlines, filte
     ddem_filled = fill_ddem(ddem, ddem_bins_filled, ref_dem, roi_mask)
 
     # Calculate glacier area within those bins
-    bins_area = xdem.volume.calculate_hypsometry_area(ddem_bins, ref_dem.data[roi_mask], pixel_size=ref_dem.res)
-    obs_area = ddem_bins["count"] * ref_dem.res[0] * ref_dem.res[1]
-    frac_obs = obs_area / bins_area
-
-    # Plot
-    if plot:
-        dh_mean = np.nanmean(ddem.data[roi_mask])
-        data, mask = gu.spatial_tools.get_array_and_mask(ddem)
-        nobs = np.sum(~mask[roi_mask.squeeze()])
-        ntot = np.sum(roi_mask)
-        roi_coverage = nobs / ntot
-        bin_width = ddem_bins.index.left - ddem_bins.index.right
-        
-        plotting.plot_mb_fig(pair_id,
-                             ddem_bins, 
-                             ddem_bins_filled, 
-                             bins_area,
-                             bin_width,
-                             frac_obs,
-                             roi_coverage,
-                             roi_outlines,
-                             dh_mean,
-                             ddem,
-                             ddem_filled,
-                             outfig=outfig)
+#     bins_area = xdem.volume.calculate_hypsometry_area(ddem_bins, ref_dem.data[roi_mask], pixel_size=ref_dem.res)
+#     obs_area = ddem_bins["count"] * ref_dem.res[0] * ref_dem.res[1]
+#     frac_obs = obs_area / bins_area
 
     # Calculate total volume change and mean dh
-    # dV = np.sum(ddem_bins_filled["value"].values * bins_area.values) / 1e9  # in km^3
-    # dh_mean = dV * 1e9 / bins_area.sum()
+#     dV = np.sum(ddem_bins_filled["value"].values * bins_area.values) / 1e9  # in km^3
+#     dh_mean = dV * 1e9 / bins_area.sum()
 
-    return ddem_filled, ddem_bins
+    return ddem_filled, ddem_bins, ddem_bins_filled
 
 
 def calculate_mb(ddem_filled, roi_outlines, stable_mask, plot=False):
