@@ -29,7 +29,8 @@ def make_spine_invisible(ax, direction):
     ax.spines[direction].set_visible(True)
     
     
-def plot_mb_fig(ddem_bins, 
+def plot_mb_fig(pair_id,
+                ddem_bins, 
                 ddem_bins_filled, 
                 bins_area,
                 bin_width,
@@ -69,9 +70,18 @@ def plot_mb_fig(ddem_bins,
         plt.xlabel("Fraction of observations")
 
         plt.figtext(x=0.31,
-                    y=0.9,
-                    s= r"Mean dH = %.2f m" % (dh_mean)+'\n'+r"ROI coverage = %.0f%%" % (roi_coverage * 100), 
-                    ha='left',color='k', weight='bold', fontsize=15)
+                    y=0.99,
+                    s= 'Period'+'\n'+\
+                       r"Mean dH" +'\n'+\
+                       r"ROI coverage", 
+                    va='top', ha='left',color='k', weight='bold', fontsize=12)
+        
+        plt.figtext(x=0.385,
+                    y=0.99,
+                    s= '= '+pair_id+'\n'+\
+                       r"= %.2f m" % (dh_mean)+'\n'+\
+                       r"= %.0f%%" % (roi_coverage * 100), 
+                    va='top', ha='left',color='k', weight='bold', fontsize=12)
         
         plt.tight_layout()
 

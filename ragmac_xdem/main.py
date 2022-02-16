@@ -174,7 +174,7 @@ def main(case: dict, mode: str, run_name: str, sat_type: str = "ASTER", nproc: i
         fig_fn = os.path.join(outdir, f"{pair_id}_mb_fig.png")
         if run["gap_filling"]:
             ddem_filled, ddem_bins = mb.fill_ddem_local_hypso(
-                ddems[pair_id], ref_dem, roi_mask, roi_outlines, filtering=run["filtering"], plot=True, outfig=fig_fn
+                pair_id, ddems, ref_dem, roi_mask, roi_outlines, filtering=run["filtering"], plot=True, outfig=fig_fn
             )
             ddems_filled[pair_id] = ddem_filled
         else:

@@ -83,12 +83,13 @@ def fill_ddem(
     return filled_ddem
 
 
-def fill_ddem_local_hypso(ddem, ref_dem, roi_mask, roi_outlines, filtering=True, plot=True, outfig=None):
+def fill_ddem_local_hypso(pair_id, ddems, ref_dem, roi_mask, roi_outlines, filtering=True, plot=True, outfig=None):
     """
     Function to fill gaps in ddems using a local hypsometric approach.
     """
     # Calculate mean elevation change within elevation bins
     # TODO: filter pixels within each bins that are outliers
+    ddem = ddems[pair_id]
     ddem_bins = xdem.volume.hypsometric_binning(ddem.data[roi_mask], ref_dem.data[roi_mask])
 
     # Filter outliers in bins
@@ -117,7 +118,8 @@ def fill_ddem_local_hypso(ddem, ref_dem, roi_mask, roi_outlines, filtering=True,
         roi_coverage = nobs / ntot
         bin_width = ddem_bins.index.left - ddem_bins.index.right
         
-        plotting.plot_mb_fig(ddem_bins, 
+        plotting.plot_mb_fig(pair_id,
+                             ddem_bins, 
                              ddem_bins_filled, 
                              bins_area,
                              bin_width,
