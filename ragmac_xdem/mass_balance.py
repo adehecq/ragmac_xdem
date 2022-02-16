@@ -14,25 +14,7 @@ from geoutils.georaster import RasterType
 from scipy.interpolate import interp1d
 from tqdm import tqdm
 from ragmac_xdem import uncertainty as err
-
-
-def make_patch_spines_invisible(ax):
-    ax.set_frame_on(True)
-    ax.patch.set_visible(False)
-    for sp in list(ax.spines.values()):
-        sp.set_visible(False)
-
-
-def make_spine_invisible(ax, direction):
-    if direction in ["right", "left"]:
-        ax.yaxis.set_ticks_position(direction)
-        ax.yaxis.set_label_position(direction)
-    elif direction in ["top", "bottom"]:
-        ax.xaxis.set_ticks_position(direction)
-        ax.xaxis.set_label_position(direction)
-    else:
-        raise ValueError("Unknown Direction : %s" % (direction,))
-    ax.spines[direction].set_visible(True)
+from ragmac_xdem import plotting
 
 
 def ddem_bins_filtering(
@@ -133,80 +115,19 @@ def fill_ddem_local_hypso(ddem, ref_dem, roi_mask, roi_outlines, filtering=True,
         nobs = np.sum(~mask[roi_mask.squeeze()])
         ntot = np.sum(roi_mask)
         roi_coverage = nobs / ntot
-    
         bin_width = ddem_bins.index.left - ddem_bins.index.right
-
-        plt.figure(figsize=(18, 6))
-
-        # Hypsometric curve
-        ax1 = plt.subplot(131)
-        p1 = plt.plot(ddem_bins["value"], ddem_bins.index.mid, linestyle="-", zorder=1, label="Raw ddem bins")
-        p1b = plt.plot(
-            ddem_bins_filled["value"],
-            ddem_bins.index.mid,
-            linestyle=":",
-            zorder=1,
-            label="Filtered + interpolated ddem bins",
-        )
-        plt.xlabel("Elevation change (m)")
-        plt.ylabel("Elevation (m)")
-        plt.legend()
         
-        ax2 = ax1.twiny()
-        p2 = plt.barh(y=ddem_bins.index.mid, width=bins_area / 1e6, height=bin_width, zorder=2, alpha=0.4)
-        plt.xlabel("Glacier area per elevation bins (km\u00b2)")
-
-        ax3 = ax1.twiny()
-        ax3.spines["top"].set_position(("axes", 1.1))
-        make_patch_spines_invisible(ax3)
-        make_spine_invisible(ax3, "top")
-        p3 = plt.barh(y=ddem_bins.index.mid, width=frac_obs, height=bin_width, zorder=2, alpha=0.4, color="gray")
-        plt.xlabel("Fraction of observations")
-        ax1.annotate(r"ROI coverage = %.0f%%" % (roi_coverage * 100), xy=(0.02, 0.95), ha='left', xycoords='axes fraction',
-                     color='k', weight='bold', fontsize=9)
-        ax1.annotate(r"Mean dH = %.2f m" % (dh_mean), xy=(0.02, 0.90), ha='left', xycoords='axes fraction',
-                     color='k', weight='bold', fontsize=9)
-        
-        plt.tight_layout()
-
-        # Set ticks color
-        tkw = dict(size=4, width=1.5)
-        ax1.tick_params(axis="x", colors=p1[0].get_color(), **tkw)
-        ax2.tick_params(axis="x", colors=p2.patches[0].get_facecolor(), **tkw)
-        ax3.tick_params(axis="x", colors=p3.patches[0].get_facecolor(), **tkw)
-
-        # ddem before interpolation
-        bounds = roi_outlines.bounds
-        pad = 2e3
-        ax2 = plt.subplot(132)
-        roi_outlines.ds.plot(ax=ax2, facecolor="none", edgecolor="k", zorder=2)
-        ddem.show(ax=ax2, cmap="coolwarm_r", add_cb=False, vmin=-50, vmax=50, zorder=1)
-        plt.xlim(bounds.left - pad, bounds.right + pad)
-        plt.ylim(bounds.bottom - pad, bounds.top + pad)
-        plt.title("dDEM before interpolation")
-
-        # ddem before interpolation
-        ax3 = plt.subplot(133, sharex=ax2, sharey=ax2)
-        roi_outlines.ds.plot(ax=ax3, facecolor="none", edgecolor="k", zorder=2)
-        ddem_filled.show(ax=ax3, cmap="coolwarm_r", add_cb=False, vmin=-50, vmax=50, zorder=1)
-        plt.title("dDEM after interpolation")
-        
-
-        # adjust cbar to match plot extent
-        for ax in [ax2,ax3]:
-            divider = make_axes_locatable(ax)
-            cax = divider.append_axes("right", size="5%", pad=0.05)
-            cmap = plt.cm.get_cmap("coolwarm_r")
-            norm = matplotlib.colors.Normalize(vmin=-50, vmax=50)
-            cbar = matplotlib.colorbar.ColorbarBase(cax, cmap=cmap, norm=norm)
-            cbar.set_label(label="Elevation change (m)")
-        plt.tight_layout()
-
-        if outfig is None:
-            plt.show()
-        else:
-            plt.savefig(outfig, dpi=200)
-            plt.close()
+        plotting.plot_mb_fig(ddem_bins, 
+                             ddem_bins_filled, 
+                             bins_area,
+                             bin_width,
+                             frac_obs,
+                             roi_coverage,
+                             roi_outlines,
+                             dh_mean,
+                             ddem,
+                             ddem_filled,
+                             outfig=outfig)
 
     # Calculate total volume change and mean dh
     # dV = np.sum(ddem_bins_filled["value"].values * bins_area.values) / 1e9  # in km^3
