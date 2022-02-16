@@ -74,13 +74,13 @@ def plot_mb_fig(pair_id,
         plt.xlabel("Fraction of observations")
         
         if not isinstance(output_mb, type(None)) & isinstance(init_stats, type(None)):
-            plt.figtext(x=0.31,
+            plt.figtext(x=0.41,
                         y=0.99,
                         s= 'Period'+'\n'+\
                            r'Mean dH' +'\n'+\
                            r'ROI coverage', 
                         va='top', ha='left',color='k', weight='bold', fontsize=12)
-            plt.figtext(x=0.385,
+            plt.figtext(x=0.485,
                         y=0.99,
                         s= '= '+pair_id+'\n'+\
                            r'= %.2f m'%(output_mb['dh_mean'].mean())+' +/- '+r'%.2f m'%(output_mb['dh_mean_err'].mean())+'\n'+\
