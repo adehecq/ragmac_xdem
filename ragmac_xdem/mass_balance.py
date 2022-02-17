@@ -182,4 +182,4 @@ def calculate_mb(ddem_filled, roi_outlines, stable_mask, plot=False):
         columns=["RGIId", "area", "dh_mean", "dh_mean_err", "dV", "dV_err"]
     )
 
-    return out_df
+    return out_df, nmad

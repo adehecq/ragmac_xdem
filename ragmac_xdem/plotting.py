@@ -30,20 +30,24 @@ def make_spine_invisible(ax, direction):
     ax.spines[direction].set_visible(True)
     
     
-def plot_mb_fig(pair_id,
+def plot_mb_fig(# hyps curve params
                 ddem_bins, 
                 ddem_bins_filled, 
                 bins_area,
                 bin_width,
                 frac_obs,
-                roi_coverage,
                 roi_outlines,
+                # stats to annotate plot with
+                pair_id,
+                roi_coverage,
                 dh_mean,
+                dh_mean_err,
+                nmad,
+                # dems to plot
                 ddem,
                 ddem_filled,
+                # plotting params
                 outfig=None,
-                output_mb = None,
-                init_stats = None,
                 bin_alpha=0.3,
                 line_width=3,
                 dh_spread_map=30,
@@ -69,8 +73,8 @@ def plot_mb_fig(pair_id,
             zorder=2, color='C1',
         )
         
-        plt.xlabel("Elevation change (m)")
-        plt.ylabel("Elevation (m)")
+        plt.xlabel("Elevation change (m)").set_fontweight('bold')
+        plt.ylabel("Elevation (m)").set_fontweight('bold')
         
         ax1.set_xlim(-dh_spread_curve,dh_spread_curve)
         
@@ -82,7 +86,7 @@ def plot_mb_fig(pair_id,
                       alpha=bin_alpha, 
                       color='C0')
         
-        plt.xlabel("Glacier area per elevation bins (km\u00b2)")
+        plt.xlabel("Glacier area per elevation bins (km\u00b2)").set_fontweight('bold')
 
         ax3 = ax1.twiny()
         ax3.spines["top"].set_position(("axes", 1.1))
@@ -94,18 +98,18 @@ def plot_mb_fig(pair_id,
                       zorder=-2, 
                       alpha=bin_alpha, 
                       color="gray")
-        plt.xlabel("Fraction of observations")
+        plt.xlabel("Fraction of observations").set_fontweight('bold')
         
         # Set custom legend
         legend_elements = [Line2D([0], [0], 
                                   color='C0', 
                                   linewidth=line_width,
-                                  label='Raw ddem bins'),
+                                  label='Raw dDEM bins'),
                            Line2D([0], [0], 
                                   color='C1', 
                                   linestyle=':',
                                   linewidth=line_width,
-                                  label='Filt + interp ddem bins'),
+                                  label='Filt + interp dDEM bins'),
                            Patch(facecolor='C0', 
                                  alpha=bin_alpha, 
                                  label='Area per bin (km\u00b2)'),
@@ -121,48 +125,43 @@ def plot_mb_fig(pair_id,
         
         
         # Annotate with stats
-        if not isinstance(output_mb, type(None)) & isinstance(init_stats, type(None)):
-            plt.figtext(x=0.41,
-                        y=0.99,
-                        s= 'Period'+'\n'+\
-                           r'Mean dH' +'\n'+\
-                           r'ROI coverage', 
-                        va='top', 
-                        ha='left',
-                        color='k', 
-                        weight='bold', 
-                        fontsize=12)
-            plt.figtext(x=0.485,
-                        y=0.99,
-                        s= '= '+pair_id+'\n'+\
-                           r'= %.2f m'%(output_mb['dh_mean'].mean())+\
-                           ' +/- '+r'%.2f m'%(output_mb['dh_mean_err'].mean())+'\n'+\
-                           r'= %.0f%%'%(init_stats['roi_cover_orig'].sum()), 
-                        va='top', 
-                        ha='left',
-                        color='k', 
-                        weight='bold', 
-                        fontsize=12)
+        plt.figtext(x=0.369,
+                    y=0.99,
+                    s= 'Period'+'\n'+\
+                       'ROI coverage', 
+                    va='top', 
+                    ha='left',
+                    color='k', 
+                    weight='bold', 
+                    fontsize=12)
+        plt.figtext(x=0.44,
+                    y=0.99,
+                    s= '= '+pair_id+'\n'+\
+                       r'= %.0f%%'%(roi_coverage*100), 
+                    va='top', 
+                    ha='left',
+                    color='k', 
+                    weight='bold', 
+                    fontsize=12)
         
-        else:
-            plt.figtext(x=0.31,
-                        y=0.99,
-                        s= 'Period'+'\n'+\
-                           r'Mean dH' +'\n'+\
-                           r'ROI coverage', 
-                        va='top', 
-                        ha='left',
-                        color='k', 
-                        weight='bold', 
-                        fontsize=12)
-        
-            plt.figtext(x=0.385,
-                        y=0.99,
-                        s= '= '+pair_id+'\n'+\
-                           r'= %.2f m' % (dh_mean)+'\n'+\
-                           r'= %.0f%%' % (roi_coverage * 100), 
-                        va='top', ha='left',color='k', weight='bold', fontsize=12)
-        
+        plt.figtext(x=0.7,
+                    y=0.99,
+                    s= 'Glaciers             mean dH ' +'\n'+\
+                       'Stable ground   NMAD ',
+                    va='top', 
+                    ha='left',
+                    color='k', 
+                    weight='bold', 
+                    fontsize=12)
+        plt.figtext(x=0.84,
+                    y=0.99,
+                    s= r'= %.2f m'%(dh_mean)+' +/- '+r'%.2f m'%(dh_mean_err)+'\n'+\
+                       r'= %.2f m'%(nmad), 
+                    va='top', 
+                    ha='left',
+                    color='k', 
+                    weight='bold', 
+                    fontsize=12)
         plt.tight_layout()
 
         # Set ticks color
@@ -206,7 +205,7 @@ def plot_mb_fig(pair_id,
             cmap = plt.cm.get_cmap("coolwarm_r")
             norm = matplotlib.colors.Normalize(vmin=-dh_spread_map, vmax=dh_spread_map)
             cbar = matplotlib.colorbar.ColorbarBase(cax, cmap=cmap, norm=norm)
-            cbar.set_label(label="Elevation change (m)")
+            cbar.set_label(label="Elevation change (m)",weight='bold')
         plt.tight_layout()
 
         if outfig is None:
