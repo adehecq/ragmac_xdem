@@ -7,13 +7,216 @@ from IPython.display import HTML
 from matplotlib import animation
 from matplotlib import pyplot as plt
 from matplotlib.lines import Line2D
+from matplotlib.patches import Patch
 from mpl_toolkits.axes_grid1 import make_axes_locatable
+
+
+def make_patch_spines_invisible(ax):
+    ax.set_frame_on(True)
+    ax.patch.set_visible(False)
+    for sp in list(ax.spines.values()):
+        sp.set_visible(False)
+
+
+def make_spine_invisible(ax, direction):
+    if direction in ["right", "left"]:
+        ax.yaxis.set_ticks_position(direction)
+        ax.yaxis.set_label_position(direction)
+    elif direction in ["top", "bottom"]:
+        ax.xaxis.set_ticks_position(direction)
+        ax.xaxis.set_label_position(direction)
+    else:
+        raise ValueError("Unknown Direction : %s" % (direction,))
+    ax.spines[direction].set_visible(True)
+    
+    
+def plot_mb_fig(# hyps curve params
+                ddem_bins, 
+                ddem_bins_filled, 
+                bins_area,
+                bin_width,
+                frac_obs,
+                roi_outlines,
+                # stats to annotate plot with
+                pair_id,
+                roi_coverage,
+                dh_mean,
+                dh_mean_err,
+                nmad,
+                # dems to plot
+                ddem,
+                ddem_filled,
+                # plotting params
+                outfig=None,
+                bin_alpha=0.3,
+                line_width=3,
+                dh_spread_map=30,
+                dh_spread_curve=40):
+    
+        plt.figure(figsize=(18, 6))
+
+        # Hypsometric curve
+        ax1 = plt.subplot(131)
+        
+        p1 = plt.plot(ddem_bins["value"], 
+                      ddem_bins.index.mid, 
+                      linestyle="-", 
+                      zorder=1,
+                      linewidth=line_width,
+                      color='C0')
+        
+        p1b = plt.plot(
+            ddem_bins_filled["value"],
+            ddem_bins.index.mid,
+            linestyle=":",
+            linewidth=line_width,
+            zorder=2, color='C1',
+        )
+        
+        plt.xlabel("Elevation change (m)").set_fontweight('bold')
+        plt.ylabel("Elevation (m)").set_fontweight('bold')
+        
+        ax1.set_xlim(-dh_spread_curve,dh_spread_curve)
+        
+        ax2 = ax1.twiny()
+        p2 = plt.barh(y=ddem_bins.index.mid, 
+                      width=bins_area / 1e6, 
+                      height=bin_width, 
+                      zorder=-1, 
+                      alpha=bin_alpha, 
+                      color='C0')
+        
+        plt.xlabel("Glacier area per elevation bins (km\u00b2)").set_fontweight('bold')
+
+        ax3 = ax1.twiny()
+        ax3.spines["top"].set_position(("axes", 1.1))
+        make_patch_spines_invisible(ax3)
+        make_spine_invisible(ax3, "top")
+        p3 = plt.barh(y=ddem_bins.index.mid, 
+                      width=frac_obs, 
+                      height=bin_width, 
+                      zorder=-2, 
+                      alpha=bin_alpha, 
+                      color="gray")
+        plt.xlabel("Fraction of observations").set_fontweight('bold')
+        
+        # Set custom legend
+        legend_elements = [Line2D([0], [0], 
+                                  color='C0', 
+                                  linewidth=line_width,
+                                  label='Raw dDEM bins'),
+                           Line2D([0], [0], 
+                                  color='C1', 
+                                  linestyle=':',
+                                  linewidth=line_width,
+                                  label='Filt + interp dDEM bins'),
+                           Patch(facecolor='C0', 
+                                 alpha=bin_alpha, 
+                                 label='Area per bin (km\u00b2)'),
+                           Patch(facecolor='gray', 
+                                 alpha=bin_alpha, 
+                                 label='Fraction of obs')]
+        
+        legend = ax1.legend(handles=legend_elements, 
+                            loc='best', 
+                            edgecolor='black')
+        legend.get_frame().set_alpha(None)
+        legend.get_frame().set_facecolor((0, 0, 0, 0))
+        
+        
+        # Annotate with stats
+        plt.figtext(x=0.369,
+                    y=0.99,
+                    s= 'Period'+'\n'+\
+                       'ROI coverage', 
+                    va='top', 
+                    ha='left',
+                    color='k', 
+                    weight='bold', 
+                    fontsize=12)
+        plt.figtext(x=0.44,
+                    y=0.99,
+                    s= '= '+pair_id+'\n'+\
+                       r'= %.0f%%'%(roi_coverage*100), 
+                    va='top', 
+                    ha='left',
+                    color='k', 
+                    weight='bold', 
+                    fontsize=12)
+        
+        plt.figtext(x=0.7,
+                    y=0.99,
+                    s= 'Glaciers             mean dH ' +'\n'+\
+                       'Stable ground   NMAD ',
+                    va='top', 
+                    ha='left',
+                    color='k', 
+                    weight='bold', 
+                    fontsize=12)
+        plt.figtext(x=0.84,
+                    y=0.99,
+                    s= r'= %.2f m'%(dh_mean)+' +/- '+r'%.2f m'%(dh_mean_err)+'\n'+\
+                       r'= %.2f m'%(nmad), 
+                    va='top', 
+                    ha='left',
+                    color='k', 
+                    weight='bold', 
+                    fontsize=12)
+        plt.tight_layout()
+
+        # Set ticks color
+        tkw = dict(size=4, width=1.5)
+        ax1.tick_params(axis="x", colors='C0', **tkw)
+        c = list(p2.patches[0].get_facecolor())
+        c[3] = c[3]*2
+        ax2.tick_params(axis="x", colors=c, **tkw)
+        
+        c = list(p3.patches[0].get_facecolor())
+        c[3] = c[3]*2
+        ax3.tick_params(axis="x", colors=c, **tkw)
+
+        # ddem before interpolation
+        bounds = roi_outlines.bounds
+        pad = 2e3
+        ax2 = plt.subplot(132)
+        roi_outlines.ds.plot(ax=ax2, facecolor="none", edgecolor="k", zorder=2)
+        ddem.show(ax=ax2, cmap="coolwarm_r", 
+                  add_cb=False, vmin=-dh_spread_map, vmax=dh_spread_map, zorder=1)
+        plt.xlim(bounds.left - pad, bounds.right + pad)
+        plt.ylim(bounds.bottom - pad, bounds.top + pad)
+        plt.title("dDEM before interpolation")
+        
+        # ddem after interpolation
+        ax3 = plt.subplot(133, sharex=ax2, sharey=ax2)
+        roi_outlines.ds.plot(ax=ax3, facecolor="none", edgecolor="k", zorder=2)
+        ddem_filled.show(ax=ax3, 
+                         cmap="coolwarm_r", 
+                         add_cb=False, 
+                         vmin=-dh_spread_map, 
+                         vmax=dh_spread_map, 
+                         zorder=1)
+        plt.title("dDEM after interpolation")
+        
+
+        # adjust cbar to match plot extent
+        for ax in [ax2,ax3]:
+            divider = make_axes_locatable(ax)
+            cax = divider.append_axes("right", size="5%", pad=0.05)
+            cmap = plt.cm.get_cmap("coolwarm_r")
+            norm = matplotlib.colors.Normalize(vmin=-dh_spread_map, vmax=dh_spread_map)
+            cbar = matplotlib.colorbar.ColorbarBase(cax, cmap=cmap, norm=norm)
+            cbar.set_label(label="Elevation change (m)",weight='bold')
+        plt.tight_layout()
+
+        if outfig is None:
+            plt.show()
+        else:
+            plt.savefig(outfig, dpi=200)
+            plt.close()
 
 """
 @author: friedrichknuth
 """
-
-
 def plot_array_gallery(array_3d, titles_list=None, figsize=(10, 15), vmin=None, vmax=None, cmap="viridis"):
 
     if not vmin:

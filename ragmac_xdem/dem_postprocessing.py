@@ -125,6 +125,11 @@ def calculate_init_stats_parallel(
     if os.path.exists(outfile) & (not overwrite):
         print(f"File {outfile} already exists -> nothing to be done")
         df_stats = pd.read_csv(outfile)
+        
+        # Change hard coded file paths if generated on another system
+        BASE_DIR = os.path.abspath(os.path.join(os.path.join(os.path.dirname(__file__), os.path.pardir)))
+        df_stats['dem_path'] = BASE_DIR+os.sep+df_stats['dem_path'].str.split('ragmac_xdem/').str[-1]
+        
         return df_stats
 
     global _stats_wrapper
@@ -535,6 +540,11 @@ def postprocessing_all(
             .drop_duplicates(keep="last", subset=["ID"])
             .sort_values(by=["ID"])
         )
+        
+        # Change hard coded file paths if generated on another system
+        BASE_DIR = os.path.abspath(os.path.join(os.path.join(os.path.dirname(__file__), os.path.pardir)))
+        out_df['coreg_path'] = BASE_DIR+os.sep+out_df['coreg_path'].str.split('ragmac_xdem/').str[-1]
+
     else:
         out_df = df
 
@@ -652,6 +662,7 @@ def merge_and_calculate_ddems(groups, validation_dates, ref_dem, mode, outdir, o
 
             # First stack all DEMs
             start = datetime.now()
+            
             dems_list = groups[count]
             dem_dates = utils.get_dems_date(dems_list)
 
