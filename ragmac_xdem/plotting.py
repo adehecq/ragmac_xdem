@@ -36,14 +36,15 @@ def plot_mb_fig(# hyps curve params
                 bins_area,
                 bin_width,
                 frac_obs,
-                roi_outlines,
                 # stats to annotate plot with
                 pair_id,
+                run_id,
                 roi_coverage,
                 dh_mean,
                 dh_mean_err,
                 nmad,
                 # dems to plot
+                roi_outlines,
                 ddem,
                 ddem_filled,
                 # plotting params
@@ -125,8 +126,17 @@ def plot_mb_fig(# hyps curve params
         
         
         # Annotate with stats
-        plt.figtext(x=0.369,
+        plt.figtext(x=0.5,
                     y=0.99,
+                    s= run_id, 
+                    va='top', 
+                    ha='left',
+                    color='k', 
+                    weight='bold', 
+                    fontsize=15)
+        
+        plt.figtext(x=0.369,
+                    y=0.94,
                     s= 'Period'+'\n'+\
                        'ROI coverage', 
                     va='top', 
@@ -135,7 +145,7 @@ def plot_mb_fig(# hyps curve params
                     weight='bold', 
                     fontsize=12)
         plt.figtext(x=0.44,
-                    y=0.99,
+                    y=0.94,
                     s= '= '+pair_id+'\n'+\
                        r'= %.0f%%'%(roi_coverage*100), 
                     va='top', 
@@ -145,7 +155,7 @@ def plot_mb_fig(# hyps curve params
                     fontsize=12)
         
         plt.figtext(x=0.7,
-                    y=0.99,
+                    y=0.94,
                     s= 'Glaciers             mean dH ' +'\n'+\
                        'Stable ground   NMAD ',
                     va='top', 
@@ -154,7 +164,7 @@ def plot_mb_fig(# hyps curve params
                     weight='bold', 
                     fontsize=12)
         plt.figtext(x=0.84,
-                    y=0.99,
+                    y=0.94,
                     s= r'= %.2f m'%(dh_mean)+' +/- '+r'%.2f m'%(dh_mean_err)+'\n'+\
                        r'= %.2f m'%(nmad), 
                     va='top', 
@@ -162,6 +172,7 @@ def plot_mb_fig(# hyps curve params
                     color='k', 
                     weight='bold', 
                     fontsize=12)
+        
         plt.tight_layout()
 
         # Set ticks color
@@ -178,7 +189,7 @@ def plot_mb_fig(# hyps curve params
         # ddem before interpolation
         bounds = roi_outlines.bounds
         pad = 2e3
-        ax2 = plt.subplot(132)
+        ax2 = plt.subplot(132)  
         roi_outlines.ds.plot(ax=ax2, facecolor="none", edgecolor="k", zorder=2)
         ddem.show(ax=ax2, cmap="coolwarm_r", 
                   add_cb=False, vmin=-dh_spread_map, vmax=dh_spread_map, zorder=1)

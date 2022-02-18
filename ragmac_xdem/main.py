@@ -151,19 +151,25 @@ def main(case: dict, mode: str, run_name: str, sat_type: str = "ASTER", nproc: i
 
         ax = plt.subplot(1, nsub, k + 1)
         roi_outlines.ds.plot(ax=ax, facecolor="none", edgecolor="k", zorder=2)
-        ddems[pair_id].show(ax=ax, cmap="coolwarm_r", vmin=-50, vmax=50, add_cb=False, zorder=1)
+        ddems[pair_id].show(ax=ax, cmap="coolwarm_r", vmin=-30, vmax=30, add_cb=False, zorder=1)
         ax.set_title(pair_id)
 
         # adjust cbar to match plot extent
         divider = make_axes_locatable(ax)
         cax = divider.append_axes("right", size="5%", pad=0.05)
         cmap = plt.cm.get_cmap("coolwarm_r")
-        norm = matplotlib.colors.Normalize(vmin=-50, vmax=50)
+        norm = matplotlib.colors.Normalize(vmin=-30, vmax=30)
         cbar = matplotlib.colorbar.ColorbarBase(cax, cmap=cmap, norm=norm)
         cbar.set_label(label="Elevation change (m)")
+        
+        #TODO add stable ground mask to this or seperate qc plot
+#         if plot_stable_mask:
+#             tmp = ddems[pair_id].copy()
+#             tmp.data[0] = stable_mask[0] # replace data array in container
+#             tmp.data[tmp.data==0.0]=np.nan
+#             tmp.show(ax=ax2, cmap="gray", vmin=1, alpha=1, add_cb=False, zorder=2)
 
     plt.tight_layout()
-#     fig_fn = os.path.join(outdir,'_'.join([case,pair_id,sat_type,mode,run_name,'ddem_fig.png']))
     fig_fn = os.path.join(outdir, "ddem_fig.png")
     plt.savefig(fig_fn)
     # plt.show()
@@ -197,7 +203,6 @@ def main(case: dict, mode: str, run_name: str, sat_type: str = "ASTER", nproc: i
         
         # Plot
         if run["gap_filling"]:
-#             fig_fn = os.path.join(outdir,'_'.join([case,pair_id,sat_type,mode,run_name,'mb_fig.png']))
             fig_fn = os.path.join(outdir, f"{pair_id}_mb_fig.png")
 
             bins_area = xdem.volume.calculate_hypsometry_area(ddem_bins, 
@@ -208,7 +213,6 @@ def main(case: dict, mode: str, run_name: str, sat_type: str = "ASTER", nproc: i
             frac_obs = obs_area / bins_area
 
             dh_mean = np.nanmean(ddems[pair_id].data[roi_mask])
-#             ddems_filled_dh_mean = np.nanmean(ddems_filled[pair_id].data[roi_mask])
             data, mask = gu.spatial_tools.get_array_and_mask(ddems[pair_id])
             nobs = np.sum(~mask[roi_mask.squeeze()])
             ntot = np.sum(roi_mask)
@@ -223,6 +227,8 @@ def main(case: dict, mode: str, run_name: str, sat_type: str = "ASTER", nproc: i
                                        output_mb['area'].values
             ddems_filled_dh_mean_err = np.sum(ddems_filled_dh_mean_err) / \
                                        np.sum(output_mb['area'].values)
+            
+            run_id = ' '.join([case,mode,run_name])
 
             plotting.plot_mb_fig(# hyps curve params
                                  ddem_bins, 
@@ -230,14 +236,15 @@ def main(case: dict, mode: str, run_name: str, sat_type: str = "ASTER", nproc: i
                                  bins_area,
                                  bin_width,
                                  frac_obs,
-                                 roi_outlines,
                                  # stats to annotate plot with
                                  pair_id,
+                                 run_id,
                                  ddems_roi_coverage,
                                  ddems_filled_dh_mean,
                                  ddems_filled_dh_mean_err,
                                  ddems_filled_nmad,
                                  # dems to plot
+                                 roi_outlines,
                                  ddems[pair_id],
                                  ddem_filled,
                                  # plotting params

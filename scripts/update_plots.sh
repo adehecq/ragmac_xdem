@@ -1,11 +1,12 @@
 #!/bin/bash
 ## Utility to run experiments and update plots.
 ## Simplest solution for now since experiments check for processed products so no major reprocessing is done.
+## TODO store all intermediate results needed for plotting on disk to update plots faster 
 
 ## Main experiments
-# python main_experiment1.py -c CH_Aletschgletscher
-# python main_experiment1.py -c AT_Hintereisferner
-# python main_experiment2.py -c PK_Baltoro
+python main_experiment1.py -c CH_Aletschgletscher
+python main_experiment1.py -c AT_Hintereisferner
+python main_experiment2.py -c PK_Baltoro
 
 ## Optional experiments
 # python main_experiment1.py -c NO_Vestisen
