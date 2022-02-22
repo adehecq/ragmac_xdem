@@ -74,9 +74,13 @@ def main(case: dict, mode: str, run_name: str, sat_type: str = "ASTER", nproc: i
     elif mode == "TimeSeries2":
         selection_opts = {"mode": "subperiod", "dt": 365}
         downsampling = 1
-        merge_opts = {"mode": "knuth"}
+        merge_opts = {"mode": "TimeSeries2"}
+    elif mode == "TimeSeries3":
+        selection_opts = {"mode": "subperiod", "dt": 365}
+        downsampling = 1
+        merge_opts = {"mode": "TimeSeries3"}
     else:
-        raise ValueError("`mode` must be either of 'median', 'shean' or knuth'")
+        raise ValueError("`mode` must be either of 'median', 'shean', TimeSeries2 or TimeSeries3'")
 
     # Get run parameters
     run = runs[run_name]

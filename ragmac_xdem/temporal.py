@@ -18,6 +18,9 @@ from sklearn.gaussian_process.kernels import (
 )
 from tqdm import tqdm
 
+import xarray as xr
+import dask
+
 from ragmac_xdem import utils
 
 ###########
@@ -330,7 +333,6 @@ def ma_linreg(
 @author: friedrichknuth
 """
 
-
 def remove_nan_from_training_data(X_train, y_train_masked_array):
     array = y_train_masked_array.data
     mask = ~np.ma.getmaskarray(y_train_masked_array)
@@ -362,7 +364,6 @@ def linreg_fit(X_train, y_train, method="TheilSen"):
         m.fit(X_train.squeeze()[:, np.newaxis], y_train.squeeze())
         slope = m.coef_
         intercept = m.intercept_
-    #         prediction = m.predict(X.squeeze()[:,np.newaxis])
 
     if method == "TheilSen":
         m = linear_model.TheilSenRegressor()
@@ -517,3 +518,28 @@ def GPR_reshape_parallel_results(results, ma_stack, valid_mask_2D):
         results_stack.append(m)
     results_stack = np.ma.stack(results_stack)
     return results_stack
+
+def dask_linreg(chunk, times = None, n_thresh = 5):
+    #TODO vectorize with numba
+    mask = ~np.isnan(chunk)
+    if np.sum(mask) < n_thresh:
+        return np.nan, np.nan
+#     m = linear_model.LinearRegression()
+    m = linear_model.TheilSenRegressor()
+    m.fit(times[mask].reshape(-1,1), chunk[mask])
+    return m.coef_[0], m.intercept_
+
+def dask_apply_linreg(DataArray, dim, kwargs=None):
+    # TODO check if da.map_blocks is faster / more memory efficient
+    # using da.apply_ufunc for now.
+    # da.map_blocks can handle chunked time dim blocks. 
+    results = xr.apply_ufunc(
+        dask_linreg,
+        DataArray,
+        kwargs=kwargs,
+        input_core_dims=[[dim]],
+        output_core_dims=[[],[]],
+        vectorize=True,
+        dask="parallelized",)
+    return results
+    
