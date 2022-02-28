@@ -475,9 +475,15 @@ def postprocessing_all(
         # Path to outputs
         out_dem_path = os.path.join(outdir, os.path.basename(dem_path).replace(".tif", "_coreg.tif"))
         out_fig = out_dem_path.replace(".tif", "_diff.png")
-        outputs = postprocessing_single(
-            dem_path, ref_dem, roi_outlines, all_outlines, out_dem_path, coreg_method=coreg_method, filtering=filtering, plot=plot, out_fig=out_fig
-        )
+        try:
+            outputs = postprocessing_single(
+                dem_path, ref_dem, roi_outlines, all_outlines, out_dem_path, coreg_method=coreg_method, filtering=filtering, plot=plot, out_fig=out_fig
+            )
+        # In case there are too few points, coregistration fail -> skip
+        # TODO: need to catch that error in a more rigorous way.
+        except (ValueError, AssertionError) as e:
+            outputs = tuple([None]*11)
+
         return outputs
 
     # Arguments to be used for the progress bar
@@ -530,7 +536,8 @@ def postprocessing_all(
             "count_filtered_pixels",
         ],
     )
-
+    
+    df.dropna(inplace=True)
     # Read stats from previous run
     stats_file = outdir + "/coreg_stats.txt"
     if os.path.exists(stats_file) & (not overwrite):
