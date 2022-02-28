@@ -96,7 +96,7 @@ def main(case: dict, mode: str, run_name: str, sat_type: str = "ASTER", nproc: i
     print("\n### Calculate initial statistics ###")
     stats_file = os.path.join(process_dir, "init_stats.csv")
     init_stats = pproc.calculate_init_stats_parallel(
-        dems_files, ref_dem, roi_outlines, all_outlines, stats_file, nthreads=nproc, overwrite=overwrite
+        dems_files, ref_dem.filename, roi_outlines, all_outlines, stats_file, nthreads=nproc, overwrite=overwrite
     )
     print(f"Statistics file saved to {stats_file}")
 

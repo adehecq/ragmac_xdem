@@ -55,7 +55,8 @@ def calculate_stats(ddem, roi_mask, stable_mask):
 
 def calculate_init_stats_single(
     dem_path: str,
-    ref_dem: xdem.DEM,
+    #ref_dem: xdem.DEM,
+    ref_dem: str,
     roi_outlines: gu.Vector,
     all_outlines: gu.Vector,
 ):
@@ -72,7 +73,14 @@ def calculate_init_stats_single(
     :returns: a tuple containing - basename of DEM, path to DEM, count of obs, median and NMAD over stable terrain, coverage over roi
     """
     # Load DEM and reproject to ref grid
+    ref_dem = xdem.DEM(ref_dem)
     dem = xdem.DEM(dem_path)
+    common_bounds = gu.projtools.merge_bounds([ref_dem.bounds,dem.bounds],merging_algorithm='intersection')
+    common_bounds = {'left':common_bounds[0],
+                    'bottom':common_bounds[1],
+                    'right':common_bounds[2],
+                    'top':common_bounds[3]} 
+    ref_dem = ref_dem.reproject(dst_res=ref_dem.res,dst_bounds=common_bounds,resampling='bilinear')
     dem = dem.reproject(ref_dem, resampling="bilinear")
 
     # Create masks
@@ -136,7 +144,10 @@ def calculate_init_stats_parallel(
 
     def _stats_wrapper(dem_path):
         """Calculate stats of a DEM in one thread."""
-        outputs = calculate_init_stats_single(dem_path, ref_dem, roi_outlines, all_outlines)
+        try:
+            outputs = calculate_init_stats_single(dem_path, ref_dem, roi_outlines, all_outlines)
+        except ValueError as e:
+            outputs = [None]*7
         return outputs
 
     # Arguments to be used for the progress bar
@@ -179,6 +190,7 @@ def calculate_init_stats_parallel(
     )
 
     # Save output to file
+    df_stats.dropna(inplace=True)
     df_stats.to_csv(outfile, index=False, float_format="%.2f")
 
     return df_stats
