@@ -313,7 +313,8 @@ def spatial_filter_ref_iter(
 
 def postprocessing_single(
     dem_path: str,
-    ref_dem: xdem.DEM,
+    #ref_dem: xdem.DEM,
+    ref_dem: str,
     roi_outlines: gu.Vector,
     all_outlines: gu.Vector,
     out_dem_path: str,
@@ -342,8 +343,18 @@ def postprocessing_single(
     :returns: a tuple containing - basename of coregistered DEM, [count of obs, median and NMAD over stable terrain, coverage over roi] before coreg, [same stats] after coreg
     """
     # Load DEM and reproject to ref grid
+    
+    ref_dem = xdem.DEM(ref_dem)
     dem = xdem.DEM(dem_path)
+    common_bounds = gu.projtools.merge_bounds([ref_dem.bounds,dem.bounds],merging_algorithm='intersection')
+    common_bounds = {'left':common_bounds[0],
+                    'bottom':common_bounds[1],
+                    'right':common_bounds[2],
+                    'top':common_bounds[3]}
+    ref_dem = ref_dem.reproject(dst_res=ref_dem.res,dst_bounds=common_bounds,resampling='bilinear')
     dem = dem.reproject(ref_dem, resampling="bilinear")
+
+    
 
     # Create masks
     roi_mask = roi_outlines.create_mask(dem)

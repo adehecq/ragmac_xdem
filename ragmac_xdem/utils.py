@@ -221,7 +221,11 @@ def dems_selection(
     :returns: List containing lists of DEM paths for each validation date. Same length as validation dates, or as the number of possible pair combinations for mode 'subperiod'.
     """
     # Remove DEMs with less than 1000 valid points, which may fail during coreg
-    dem_path_list = dem_path_list[init_stats["nstable_orig"] > 1e3]
+    # modified to avoid conflict if init stats failed for edgecase DEM
+     
+    mask = init_stats["nstable_orig"] > 1e3
+    dem_path_list = init_stats[mask]["dem_path"].values
+    #dem_path_list = dem_path_list[init_stats["nstable_orig"] > 1e3]
 
     if mode is None:
         print(f"Found {len(dem_path_list)} DEMs")
@@ -247,6 +251,7 @@ def dems_selection(
                 matching_dates = np.where((date1 <= dems_dates) & (dems_dates <= date2) & np.isin(dems_months, months))[
                     0
                 ]
+                
                 output_list.append(dem_path_list[matching_dates])
                 print(f"For period {validation_dates[k1]} - {validation_dates[k2]} found {len(matching_dates)} DEMs")
             return output_list

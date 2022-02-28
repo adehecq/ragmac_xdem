@@ -111,7 +111,7 @@ def main(case: dict, mode: str, run_name: str, sat_type: str = "ASTER", nproc: i
     print("\n### Coregister DEMs ###")
     stats, groups_coreg = pproc.postprocessing_all(
         groups,
-        ref_dem,
+        ref_dem.filename,
         roi_outlines,
         all_outlines,
         coreg_dir,
