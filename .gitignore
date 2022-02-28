@@ -4,13 +4,14 @@ __pycache__/
 
 # C extensions
 *.so
+# Dask
+dask-worker-space/
 
 # Distribution / packaging
 .Python
-dask-worker-space/
 dev/
 src/
-nv/
+env/
 build/
 develop-eggs/
 dist/

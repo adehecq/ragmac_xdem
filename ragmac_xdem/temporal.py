@@ -519,14 +519,14 @@ def GPR_reshape_parallel_results(results, ma_stack, valid_mask_2D):
     results_stack = np.ma.stack(results_stack)
     return results_stack
 
-def dask_linreg(chunk, times = None, n_thresh = 5):
+def dask_linreg(DataArray, times = None, n_thresh = 5):
     #TODO vectorize with numba
-    mask = ~np.isnan(chunk)
+    mask = ~np.isnan(DataArray)
     if np.sum(mask) < n_thresh:
         return np.nan, np.nan
 #     m = linear_model.LinearRegression()
     m = linear_model.TheilSenRegressor()
-    m.fit(times[mask].reshape(-1,1), chunk[mask])
+    m.fit(times[mask].reshape(-1,1), DataArray[mask])
     return m.coef_[0], m.intercept_
 
 def dask_apply_linreg(DataArray, dim, kwargs=None):
