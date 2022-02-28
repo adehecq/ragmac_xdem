@@ -767,8 +767,9 @@ def merge_and_calculate_ddems(groups, validation_dates, ref_dem, mode, outdir, o
             
             # need to convert timestamps back to yr-1 if using matplotlib.dates.date2num
             # these same conversions are used in temporal.ma_linreg()
-            slope = results['slope'].values
-            slope *= 365.25
+            results['slope'] = results['slope'] * 365.25
+            
+            slope = np.ma.masked_invalid(results['slope'].values)
 
             # Finally, calculate total elevation change
             date1 = validation_dates[k1]
