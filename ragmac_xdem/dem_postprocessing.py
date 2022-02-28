@@ -20,6 +20,8 @@ import pandas as pd
 import xdem
 from skimage.morphology import disk
 from tqdm import tqdm
+import matplotlib
+import xarray as xr
 
 from ragmac_xdem import io, temporal, utils
 
@@ -620,7 +622,7 @@ def merge_and_calculate_ddems(groups, validation_dates, ref_dem, mode, outdir, o
                 ddems[pair_id] = mosaics[date2] - mosaics[date1]
 
     elif mode == "shean":
-
+        
         for count, pair in enumerate(pair_indexes):
             k1, k2 = pair
             dems_list = groups[count]
@@ -658,42 +660,46 @@ def merge_and_calculate_ddems(groups, validation_dates, ref_dem, mode, outdir, o
             dyear = (date2_dt - date1_dt).total_seconds() / (3600 * 24 * 365.25)
             ddems[pair_id] = dyear * slope
 
-    elif mode == "knuth":
-
+    elif mode == "TimeSeries2":
+        
         for count, pair in enumerate(pair_indexes):
             k1, k2 = pair
-            date1 = validation_dates[k1]
-            date2 = validation_dates[k2]
+            dems_list = groups[count]
             pair_id = pair_ids[count]
             print(f"\nProcessing pair {pair_id}")
 
             # First stack all DEMs
             start = datetime.now()
-            
-            dems_list = groups[count]
             dem_dates = utils.get_dems_date(dems_list)
-
             ds = io.xr_stack_geotifs(dems_list, dem_dates, ref_dem.filename)
-
             ma_stack = np.ma.masked_invalid(ds["band1"].values)
 
             print("\n### Prepare training data ###")
-            X_train = np.ma.array([utils.date_time_to_decyear(i) for i in dem_dates]).data
-            valid_data, valid_mask_2D = temporal.mask_low_count_pixels(ma_stack, n_thresh=5)
+            ## TODO: Determine which time conversion to use as this slightly changes the result.
+#             X_train = np.ma.array([utils.date_time_to_decyear(i) for i in dem_dates]).data
+            X_train = np.array(matplotlib.dates.date2num(dem_dates))
+    
+            n_thresh = 5
+            print('Excluding pixels with count <',n_thresh)
+            valid_data, valid_mask_2D = temporal.mask_low_count_pixels(ma_stack, n_thresh=n_thresh)
 
             # Then calculate linear fit
             print("\n### Run linear fit ###")
             results = temporal.linreg_run_parallel(X_train, valid_data, cpu_count=nproc, method="TheilSen")
+            
             results_stack = temporal.linreg_reshape_parallel_results(results, ma_stack, valid_mask_2D)
 
             slope = results_stack[0]
-            intercept = results_stack[1]
+            ## Only do this if X_train was generated with matplotlib.dates.date2num. Same procedure as in ma_linreg
+            slope *= 365.25
+
 
             now = datetime.now()
             dt = now - start
             print("Elapsed time:", str(dt).split(".")[0])
 
             # Not needed for now
+            # intercept = results_stack[1]
             # print('\n### Compute residuals ###')
             # prediction = temporal.linreg_predict_parallel(slope,X_train,intercept, cpu_count=nproc)
             # residuals  = ma_stack - prediction
@@ -711,13 +717,77 @@ def merge_and_calculate_ddems(groups, validation_dates, ref_dem, mode, outdir, o
             # print('Elapsed time:', str(dt).split(".")[0])
 
             # Finally, calculate total elevation change
+            date1 = validation_dates[k1]
+            date2 = validation_dates[k2]
+            date1_dt = datetime.strptime(date1, "%Y-%m-%d")
+            date2_dt = datetime.strptime(date2, "%Y-%m-%d")
+            dyear = (date2_dt - date1_dt).total_seconds() / (3600 * 24 * 365.25)
+            ddems[pair_id] = dyear * slope
+            
+    elif mode == "TimeSeries3":
+
+        for count, pair in enumerate(pair_indexes):
+            k1, k2 = pair
+            dems_list = groups[count]
+            pair_id = pair_ids[count]
+            print(f"\nProcessing pair {pair_id}")
+            
+            dems_list = groups[count]
+            dem_dates = utils.get_dems_date(dems_list)
+            
+            time_stamps = np.array(matplotlib.dates.date2num(dem_dates))
+#             time_stamps = np.array([utils.date_time_to_decyear(i) for i in dem_dates])
+
+            ds = io.xr_stack_geotifs(dems_list, dem_dates, ref_dem.filename)
+            
+            # Find optimal chunking scheme
+            
+            # Use full dim length in time but chunk x y into something sensible to speed up processing (WIP)
+            t = len(ds.time)
+            x = len(ds.x)
+            y = len(ds.y)
+            print('\ndata dims: x, y, time')
+            print('data shape:', x,y,t)
+            
+            x = utils.roundup(np.sqrt(len(ds.x))*2)
+            y = utils.roundup(np.sqrt(len(ds.y))*2)
+            print('chunk shape:', x,y,t)
+            
+            # TODO pass down client object to print address here instead of earlier.
+            print('\nCheck dask dashboard to monitor progress. See stdout above for address to dashboard.')
+
+            ds = ds.chunk({"time":t, "x":x, "y":y})
+            
+            n_thresh = 5
+            print('Excluding pixels with count <',n_thresh)
+            results = temporal.dask_apply_linreg(ds['band1'],
+                                                 'time', 
+                                                 kwargs={'times':time_stamps,
+                                                         'n_thresh':n_thresh})
+            
+            start = datetime.now()
+            results = xr.Dataset({'slope':results[0],
+                                  'intercept':results[1]}).compute()
+            now = datetime.now()
+            dt = now - start
+            print("Elapsed dask compute time:", str(dt).split(".")[0])
+            
+            # need to convert timestamps back to yr-1 if using matplotlib.dates.date2num
+            # these same conversions are used in temporal.ma_linreg()
+            results['slope'] = results['slope'] * 365.25
+            
+            slope = np.ma.masked_invalid(results['slope'].values)
+
+            # Finally, calculate total elevation change
+            date1 = validation_dates[k1]
+            date2 = validation_dates[k2]
             date1_dt = datetime.strptime(date1, "%Y-%m-%d")
             date2_dt = datetime.strptime(date2, "%Y-%m-%d")
             dyear = (date2_dt - date1_dt).total_seconds() / (3600 * 24 * 365.25)
             ddems[pair_id] = dyear * slope
 
     else:
-        raise NotImplementedError("`mode` must be either of 'median', 'shean' or 'knuth'")
+        raise NotImplementedError("`mode` must be either of 'median', 'shean', 'TimeSeries2, or TimeSeries3'")
 
     # Convert masked arrays to gu.Raster
     for key in list(ddems.keys()):

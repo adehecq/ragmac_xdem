@@ -8,7 +8,7 @@ import argparse
 import multiprocessing as mp
 import traceback
 
-from ragmac_xdem import main
+from ragmac_xdem import main, io
 
 if __name__ == "__main__":
 
@@ -70,6 +70,13 @@ if __name__ == "__main__":
 
     if args.run is not None:
         all_runs = [args.run]
+        
+    if args.mode == "TimeSeries3":
+        # Need to launch cluster in main script
+        from ragmac_xdem import temporal
+        # TODO add ip_address as an input option.
+        ip_addres=None
+        client = io.dask_start_cluster(args.nproc, ip_addres=ip_addres)
 
     nruns = len(all_cases) * len(all_modes) * len(all_runs)
     print(f"## Total of {nruns} runs to be processed ##")

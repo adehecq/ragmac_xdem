@@ -8,9 +8,34 @@ import rioxarray
 import xarray as xr
 from rasterio.enums import Resampling
 
+from dask.distributed import Client, LocalCluster
+import logging
+
 """
 @author: friedrichknuth
 """
+
+def dask_start_cluster(nproc, threads=1, ip_addres=None):
+    """
+    Starts a dask cluster. Can provide a custom IP or URL to view the progress dashboard. 
+    This may be necessary if working on a remote machine.
+    """
+    cluster = LocalCluster(n_workers=nproc,
+                       threads_per_worker=threads,
+                       silence_logs=logging.ERROR)
+
+    client = Client(cluster)
+    
+    if ip_addres:
+        port = str(cluster.dashboard_link.split(':')[-1])
+        url = ":".join([ip_addres,port])
+        print('\n'+'Dask dashboard at:',url)
+    else:
+        print('\n'+'Dask dashboard at:',cluster.dashboard_link)
+    
+    print('Workers:', nproc)
+    print('Threads per worker:', threads, '\n')
+    return client
 
 
 def stack_geotif_arrays(geotif_files_list):
@@ -131,7 +156,7 @@ def xr_stack_geotifs(geotif_files_list, datetimes_list, reference_geotif_file, r
         if save_to_nc:
             out_fn = str(pathlib.Path(file_name).with_suffix("")) + ".nc"
             src.to_netcdf(out_fn)
-            out_dir = str(pathlib.Path(dems_list[i]).parents[0])
+            out_dir = str(pathlib.Path(geotif_files_list[index]).parents[0])
 
         datasets.append(src)
 
