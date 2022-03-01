@@ -80,7 +80,7 @@ def main(case: dict, mode: str, run_name: str, sat_type: str = "ASTER", nproc: i
         downsampling = 1
         merge_opts = {"mode": "TimeSeries3"}
     else:
-        raise ValueError("`mode` must be either of 'median', 'shean', TimeSeries2 or TimeSeries3'")
+        raise ValueError("`mode` must be either of 'DEMdiff_autoselect', 'DEMdiff_median', 'TimeSeries', 'TimeSeries2' or 'TimeSeries3'")
 
     # Get run parameters
     run = runs[run_name]
