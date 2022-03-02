@@ -54,8 +54,8 @@ def ddem_bins_filtering(
 
 
 def fill_ddem(
-    ddem: RasterType, ddem_bins: pd.DataFrame, ref_dem: RasterType, roi_mask: np.ndarray = None
-) -> RasterType:
+        ddem: RasterType, ddem_bins: pd.DataFrame, ref_dem: RasterType, roi_mask: np.ndarray = None
+) -> tuple[RasterType, RasterType]:
     """
     Fill gaps in ddem with values interpolated from altitudinal bins in ddem_bins.
 
@@ -63,6 +63,8 @@ def fill_ddem(
     :param ddem_bins: the altitudinally averaged ddem bins
     :param ref_dem: a reference elevation used for interpolating all pixels
     :param roi_mask: a mask of pixels to be interpolated
+
+    :returns: two Rasters, one containing teh gap-filled DEM within roi_mask, one containing the interpolation residuals, i.e. ddem - interpolated_ddem.
     """
     # Create a model for 2D interpolation
     gradient_model = interp1d(ddem_bins.index.mid, ddem_bins["value"].values, fill_value="extrapolate")
@@ -72,15 +74,19 @@ def fill_ddem(
 
     # Mask of pixels to be interpolated
     if roi_mask is None:
-        mask = ddem.data.mask & ~ref_mask
-    else:
-        mask = roi_mask & ddem.data.mask & ~ref_mask
+        roi_mask = np.ones_like(ddem.data.mask)
+    mask = roi_mask & ddem.data.mask & ~ref_mask
 
     # Fill ddem
+    interp_ddem = gradient_model(ref_dem_array)
     filled_ddem = ddem.copy()
-    filled_ddem.data[mask] = gradient_model(ref_dem_array[mask.squeeze()])
+    filled_ddem.data[mask] = interp_ddem[mask.squeeze()]
 
-    return filled_ddem
+    # Calculate residuals
+    residuals = ddem - interp_ddem.reshape(ddem.data.shape)
+    residuals.data.mask[~roi_mask] = True
+
+    return filled_ddem, residuals
 
 
 def fill_ddem_local_hypso(ddem, ref_dem, roi_mask, roi_outlines, filtering=True):
@@ -101,7 +107,7 @@ def fill_ddem_local_hypso(ddem, ref_dem, roi_mask, roi_outlines, filtering=True)
     ddem_bins_filled = xdem.volume.interpolate_hypsometric_bins(ddem_bins_filtered, method="linear")
 
     # Create 2D filled dDEM
-    ddem_filled = fill_ddem(ddem, ddem_bins_filled, ref_dem, roi_mask)
+    ddem_filled, interp_residuals = fill_ddem(ddem, ddem_bins_filled, ref_dem, roi_mask)
 
     # Calculate glacier area within those bins
 #     bins_area = xdem.volume.calculate_hypsometry_area(ddem_bins, ref_dem.data[roi_mask], pixel_size=ref_dem.res)
@@ -112,7 +118,7 @@ def fill_ddem_local_hypso(ddem, ref_dem, roi_mask, roi_outlines, filtering=True)
 #     dV = np.sum(ddem_bins_filled["value"].values * bins_area.values) / 1e9  # in km^3
 #     dh_mean = dV * 1e9 / bins_area.sum()
 
-    return ddem_filled, ddem_bins, ddem_bins_filled
+    return ddem_filled, ddem_bins, ddem_bins_filled, interp_residuals
 
 
 def calculate_mb(ddem_filled, roi_outlines, stable_mask, plot=False):
