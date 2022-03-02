@@ -131,7 +131,7 @@ def calculate_mb(ddem_filled, roi_outlines, stable_mask, plot=False):
         warnings.warn("dDEM contains gaps in ROI - mean value will be biased")
 
     rgi_ids = roi_outlines.ds.RGIId
-    dh_means, dh_means_err, volumes, volumes_err, areas = [], [], [], [], []
+    dh_means, dh_spat_errs, areas = [], [], []
 
     for gid in tqdm(rgi_ids, desc="Looping through all glaciers"):
 
@@ -166,20 +166,41 @@ def calculate_mb(ddem_filled, roi_outlines, stable_mask, plot=False):
             area = float(gl_outline.ds["Area"] * 1e6)
             dV = dh_mean * area
 
-        # Calculate associated errors bars
-        dh_mean_err = err.err_500m_vario(nmad, area)  # err.compute_mean_dh_error(gl_mask, dh_err, vgm_params, res=ddem_filled.res[0])
-        dV_err = dh_mean_err * area
+        # Calculate spatially correlated error
+        dh_spat_err = err.err_500m_vario(nmad, area)  # err.compute_mean_dh_error(gl_mask, dh_err, vgm_params, res=ddem_filled.res[0])
 
         # Save to output lists
         dh_means.append(dh_mean)
-        dh_means_err.append(dh_mean_err)
+        dh_spat_errs.append(dh_spat_err)
         areas.append(area / 1e6)
-        volumes.append(dV / 1e9)
-        volumes_err.append(dV_err / 1e9)
+
+    # Convert outputs to numpy arrays
+    dh_means = np.array(dh_means)
+    dh_spat_errs = np.array(dh_spat_errs)
+    areas = np.array(areas)
+
+    # Calculate volume change
+    volumes = dh_means * areas / 1e9
+
+    # -- Calculate final uncertainty -- #
+    # Relative uncertainty in area with a 30 m buffer
+    area_err = err.err_area_buffer(roi_outlines, buffer=30, plot=False)
+
+    # Final error
+    dh_area_err = np.abs(dh_means) * area_err
+    dh_interp_err = np.zeros_like(dh_area_err)
+    dh_temporal_err = np.zeros_like(dh_area_err)
+    dh_err = np.sqrt(dh_spat_errs**2 + dh_area_err**2 + dh_interp_err**2 + dh_temporal_err**2)
+    volumes_err = dh_err * areas / 1e9
 
     out_df = pd.DataFrame(
-        data=np.vstack([rgi_ids, areas, dh_means, dh_means_err, volumes, volumes_err]).T,
-        columns=["RGIId", "area", "dh_mean", "dh_mean_err", "dV", "dV_err"]
+        data=np.vstack([rgi_ids, areas, dh_means, dh_spat_errs, volumes, volumes_err, area_err, dh_area_err, dh_interp_err, dh_temporal_err]).T,
+        columns=["RGIId", "area", "dh_mean", "dh_mean_err", "dV", "dV_err", "area_err", "dh_area_err", "dh_interp_err", "dh_temporal_err"]
     )
+
+    # Convert relevant columns to numeric type
+    for col in out_df.columns:
+        if col != 'RGIId':
+            out_df[col] = pd.to_numeric(out_df[col])
 
     return out_df, nmad
