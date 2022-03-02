@@ -412,16 +412,9 @@ def err_500m_vario(nmad, area):
     err = nmad / np.sqrt(neff)
     return err
 
-def err_area_const(dh_mean, area_err=0.1):
+def err_area_buffer(roi_outlines, buffer=30, plot=False):
     """
-    Calculate the error in mean dh due to a fractional area uncertainty.
-    Default is 10% (2-sigma) error in area.
-    """
-    return np.abs(dh_mean) * area_err
-
-def err_area_buffer(dh_means, roi_outlines, buffer=30, plot=False):
-    """
-    Calculate the error in mean dh due to uncertainties in area, estimated as a buffer around known outline.
+    Calculate the fractional area uncertainty, estimated by adding a buffer around known outlines.
     Default is 30 m buffer (2-sigma).
     """
     # Create new GeoDataFrame with buffered polygons
@@ -431,24 +424,20 @@ def err_area_buffer(dh_means, roi_outlines, buffer=30, plot=False):
     # Calculate relative error in area
     area_err = (out_gdf.area - roi_outlines.ds.area) / roi_outlines.ds.area
 
-    # Calculate associated error in mean dh
-    dh_err = np.abs(dh_means) * area_err
-
     # Plot
     if plot:
         out_gdf['area_err'] = area_err * 100
-        out_gdf['dh_err'] = dh_err
 
-        fig = plt.figure(figsize=(12, 6))
-        ax1 = plt.subplot(121)
+        fig = plt.figure(figsize=(8, 6))
+        ax1 = plt.subplot(111)
         out_gdf.plot(ax=ax1, column='area_err', legend=True, cmap='Reds', vmax=np.percentile(out_gdf['area_err'], 90))
         ax1.set_title('Area error (%)')
 
-        ax2 = plt.subplot(122)
-        out_gdf.plot(ax=ax2, column='dh_err', legend=True, cmap='Reds', vmax=np.percentile(out_gdf['dh_err'], 90))
-        ax2.set_title('Mean dh error (m)')
+        # ax2 = plt.subplot(122)
+        # out_gdf.plot(ax=ax2, column='dh_err', legend=True, cmap='Reds', vmax=np.percentile(out_gdf['dh_err'], 90))
+        # ax2.set_title('Mean dh error (m)')
 
         plt.tight_layout()
         plt.show()
 
-    return dh_err
+    return area_err
