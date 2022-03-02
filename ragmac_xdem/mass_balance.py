@@ -164,15 +164,14 @@ def calculate_mb(ddem_filled, roi_outlines, stable_mask, plot=False):
             dh_mean = np.mean(dh_subset)
             # area = np.count_nonzero(gl_mask) * ddem_filled.res[0] * ddem_filled.res[1]
             area = float(gl_outline.ds["Area"] * 1e6)
-            dV = dh_mean * area
 
         # Calculate spatially correlated error
         dh_spat_err = err.err_500m_vario(nmad, area)  # err.compute_mean_dh_error(gl_mask, dh_err, vgm_params, res=ddem_filled.res[0])
 
         # Save to output lists
-        dh_means.append(dh_mean)
+        dh_means.append(dh_mean)  # m
         dh_spat_errs.append(dh_spat_err)
-        areas.append(area / 1e6)
+        areas.append(area / 1e6)  # km2
 
     # Convert outputs to numpy arrays
     dh_means = np.array(dh_means)
@@ -180,22 +179,23 @@ def calculate_mb(ddem_filled, roi_outlines, stable_mask, plot=False):
     areas = np.array(areas)
 
     # Calculate volume change
-    volumes = dh_means * areas / 1e9
+    volumes = dh_means / 1e3 * areas  # km3
 
     # -- Calculate final uncertainty -- #
     # Relative uncertainty in area with a 30 m buffer
     area_err = err.err_area_buffer(roi_outlines, buffer=30, plot=False)
 
-    # Final error
-    dh_area_err = np.abs(dh_means) * area_err
-    dh_interp_err = np.zeros_like(dh_area_err)
-    dh_temporal_err = np.zeros_like(dh_area_err)
-    dh_err = np.sqrt(dh_spat_errs**2 + dh_area_err**2 + dh_interp_err**2 + dh_temporal_err**2)
-    volumes_err = dh_err * areas / 1e9
+    # Final error, calculated for volume in km3 rather than dh, according to RAGMAC expected outputs
+    dV_spat_err = dh_spat_errs * areas / 1e3
+    dV_area_err = np.abs(dh_means) * area_err * areas / 1e3
+    dV_interp_err = np.zeros_like(dV_area_err)
+    dV_temporal_err = np.zeros_like(dV_area_err)
+    dV_err = np.sqrt(dV_spat_err**2 + dV_area_err**2 + dV_interp_err**2 + dV_temporal_err**2)
+    dh_err = dV_err / areas * 1e3
 
     out_df = pd.DataFrame(
-        data=np.vstack([rgi_ids, areas, dh_means, dh_spat_errs, volumes, volumes_err, area_err, dh_area_err, dh_interp_err, dh_temporal_err]).T,
-        columns=["RGIId", "area", "dh_mean", "dh_mean_err", "dV", "dV_err", "area_err", "dh_area_err", "dh_interp_err", "dh_temporal_err"]
+        data=np.vstack([rgi_ids, areas, dh_means, dh_err, volumes, dV_err, area_err, dV_spat_err, dV_area_err, dV_interp_err, dV_temporal_err]).T,
+        columns=["RGIId", "area", "dh_mean", "dh_mean_err", "dV", "dV_err", "area_err", "dV_spat_err", "dV_area_err", "dV_interp_err", "dV_temporal_err"]
     )
 
     # Convert relevant columns to numeric type
