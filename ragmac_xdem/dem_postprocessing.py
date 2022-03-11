@@ -57,8 +57,7 @@ def calculate_stats(ddem, roi_mask, stable_mask):
 
 def calculate_init_stats_single(
     dem_path: str,
-    #ref_dem: xdem.DEM,
-    ref_dem: str,
+    ref_dem_path: str,
     roi_outlines: gu.Vector,
     all_outlines: gu.Vector,
 ):
@@ -75,15 +74,10 @@ def calculate_init_stats_single(
     :returns: a tuple containing - basename of DEM, path to DEM, count of obs, median and NMAD over stable terrain, coverage over roi
     """
     # Load DEM and reproject to ref grid
-    ref_dem = xdem.DEM(ref_dem)
+    ref_dem = xdem.DEM(ref_dem_path)
     dem = xdem.DEM(dem_path)
-    common_bounds = gu.projtools.merge_bounds([ref_dem.bounds,dem.bounds],merging_algorithm='intersection')
-    common_bounds = {'left':common_bounds[0],
-                    'bottom':common_bounds[1],
-                    'right':common_bounds[2],
-                    'top':common_bounds[3]} 
-    ref_dem = ref_dem.reproject(dst_res=ref_dem.res,dst_bounds=common_bounds,resampling='bilinear')
-    dem = dem.reproject(ref_dem, resampling="bilinear")
+    ref_dem = ref_dem.reproject(dem,resampling='bilinear')
+    
 
     # Create masks
     roi_mask = roi_outlines.create_mask(dem)
@@ -315,8 +309,7 @@ def spatial_filter_ref_iter(
 
 def postprocessing_single(
     dem_path: str,
-    #ref_dem: xdem.DEM,
-    ref_dem: str,
+    ref_dem_path: str,
     roi_outlines: gu.Vector,
     all_outlines: gu.Vector,
     out_dem_path: str,
@@ -346,15 +339,9 @@ def postprocessing_single(
     """
     # Load DEM and reproject to ref grid
     
-    ref_dem = xdem.DEM(ref_dem)
+    ref_dem = xdem.DEM(ref_dem_path)
     dem = xdem.DEM(dem_path)
-    common_bounds = gu.projtools.merge_bounds([ref_dem.bounds,dem.bounds],merging_algorithm='intersection')
-    common_bounds = {'left':common_bounds[0],
-                    'bottom':common_bounds[1],
-                    'right':common_bounds[2],
-                    'top':common_bounds[3]}
-    ref_dem = ref_dem.reproject(dst_res=ref_dem.res,dst_bounds=common_bounds,resampling='bilinear')
-    dem = dem.reproject(ref_dem, resampling="bilinear")
+    ref_dem = ref_dem.reproject(dem,resampling='bilinear')
 
     
 
@@ -426,7 +413,9 @@ def postprocessing_single(
             plt.close()
 
     # Save coregistered DEM
-    dem_coreg.save(out_dem_path, tiled=True)
+    # project to reference DEM grid for stacking and hole filling later
+    dem_coreg.reproject(xdem.DEM(ref_dem_path),resampling='bilinear').save(out_dem_path,tiled=True)
+    #dem_coreg.save(out_dem_path, tiled=True)
 
     return (
         os.path.basename(dem_path),
@@ -757,12 +746,16 @@ def merge_and_calculate_ddems(groups, validation_dates, ref_dem, mode, outdir, o
             
             dems_list = groups[count]
             dem_dates = utils.get_dems_date(dems_list)
-            
+            print(f"Number of DEMs found {len(dems_list)}") 
             time_stamps = np.array(matplotlib.dates.date2num(dem_dates))
 #             time_stamps = np.array([utils.date_time_to_decyear(i) for i in dem_dates])
-
+            print("Starting to stack dems")
+            from datetime import datetime
+            print('\n%s' % datetime.now())
+            print('%s UTC\n' % datetime.utcnow())
             ds = io.xr_stack_geotifs(dems_list, dem_dates, ref_dem.filename)
-            
+            print('\n%s' % datetime.now())
+            print('%s UTC\n' % datetime.utcnow())
             # Find optimal chunking scheme
             
             # Use full dim length in time but chunk x y into something sensible to speed up processing (WIP)
