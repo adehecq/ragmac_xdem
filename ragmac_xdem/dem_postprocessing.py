@@ -746,16 +746,13 @@ def merge_and_calculate_ddems(groups, validation_dates, ref_dem, mode, outdir, o
             
             dems_list = groups[count]
             dem_dates = utils.get_dems_date(dems_list)
-            print(f"Number of DEMs found {len(dems_list)}") 
+             
             time_stamps = np.array(matplotlib.dates.date2num(dem_dates))
 #             time_stamps = np.array([utils.date_time_to_decyear(i) for i in dem_dates])
             print("Starting to stack dems")
-            from datetime import datetime
-            print('\n%s' % datetime.now())
-            print('%s UTC\n' % datetime.utcnow())
+            
             ds = io.xr_stack_geotifs(dems_list, dem_dates, ref_dem.filename)
-            print('\n%s' % datetime.now())
-            print('%s UTC\n' % datetime.utcnow())
+
             # Find optimal chunking scheme
             
             # Use full dim length in time but chunk x y into something sensible to speed up processing (WIP)
