@@ -59,7 +59,7 @@ def stack_geotif_arrays(geotif_files_list):
     return ma_stack
 
 
-def xr_read_geotif(geotif_file_path, chunks=1000, masked=True):
+def xr_read_geotif(geotif_file_path, chunks='auto', masked=True):
     """
     Reads in single or multi-band GeoTIFF as dask array.
 
