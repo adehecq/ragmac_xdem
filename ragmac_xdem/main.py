@@ -191,11 +191,13 @@ def main(case: dict, mode: str, run_name: str, sat_type: str = "ASTER", nproc: i
         # -- Interpolate -- #
         
         if run["gap_filling"]:
-            ddem_filled, ddem_bins, ddem_bins_filled = mb.fill_ddem_local_hypso(ddems[pair_id], 
-                                                                                  ref_dem, 
-                                                                                  roi_mask, 
-                                                                                  roi_outlines, 
-                                                                                  filtering=run["filtering"])
+            ddem_filled, ddem_bins, ddem_bins_filled, interp_residuals = mb.fill_ddem_local_hypso(
+                ddems[pair_id],
+                ref_dem,
+                roi_mask,
+                roi_outlines,
+                filtering=run["filtering"]
+            )
             ddems_filled[pair_id] = ddem_filled
         else:
             ddems_filled[pair_id] = ddems[pair_id]
@@ -328,7 +330,7 @@ def main(case: dict, mode: str, run_name: str, sat_type: str = "ASTER", nproc: i
             "temporal_sigma_km3",
         ]
         errors_file = os.path.join(outdir, f"xdem_{case}_{year1}_{year2}_{mode}_errors.csv")
-        import IPython; IPython.embed()
+
         print(f"Saving errors to file {errors_file}\n")
         output_mb.to_csv(
             errors_file,
