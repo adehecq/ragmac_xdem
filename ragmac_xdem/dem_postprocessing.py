@@ -140,6 +140,9 @@ def calculate_init_stats_parallel(
 
     def _stats_wrapper(dem_path):
         """Calculate stats of a DEM in one thread."""
+        # this try-except block catches error that arise when the source DEM is at the edge of aoi
+        # an example error is plotted in PR#59 
+        # https://github.com/adehecq/ragmac_xdem/pull/59
         try:
             outputs = calculate_init_stats_single(dem_path, ref_dem, roi_outlines, all_outlines)
         except ValueError as e:
