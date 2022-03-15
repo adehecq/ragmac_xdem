@@ -21,7 +21,7 @@ from ragmac_xdem import utils
 from ragmac_xdem import plotting
 
 # Set parameters for the different runs to be processed
-default_coreg = xdem.coreg.NuthKaab() + xdem.coreg.BiasCorr(bias_func=np.nanmedian)
+default_coreg = xdem.coreg.NuthKaab() + xdem.coreg.Deramp(degree=1) + xdem.coreg.BiasCorr(bias_func=np.nanmedian)
 
 runs = {
     "CTL": {"coreg_method": default_coreg, "filtering": True, "coreg_dir": "coreg1_filter1", "gap_filling": True},
