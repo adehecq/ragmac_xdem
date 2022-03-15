@@ -57,7 +57,7 @@ def calculate_stats(ddem, roi_mask, stable_mask):
 
 def calculate_init_stats_single(
     dem_path: str,
-    ref_dem: xdem.DEM,
+    ref_dem_path: str,
     roi_outlines: gu.Vector,
     all_outlines: gu.Vector,
 ):
@@ -74,8 +74,10 @@ def calculate_init_stats_single(
     :returns: a tuple containing - basename of DEM, path to DEM, count of obs, median and NMAD over stable terrain, coverage over roi
     """
     # Load DEM and reproject to ref grid
+    ref_dem = xdem.DEM(ref_dem_path)
     dem = xdem.DEM(dem_path)
-    dem = dem.reproject(ref_dem, resampling="bilinear")
+    ref_dem = ref_dem.reproject(dem,resampling='bilinear')
+    
 
     # Create masks
     roi_mask = roi_outlines.create_mask(dem)
@@ -138,7 +140,13 @@ def calculate_init_stats_parallel(
 
     def _stats_wrapper(dem_path):
         """Calculate stats of a DEM in one thread."""
-        outputs = calculate_init_stats_single(dem_path, ref_dem, roi_outlines, all_outlines)
+        # this try-except block catches error that arise when the source DEM is at the edge of aoi
+        # an example error is plotted in PR#59 
+        # https://github.com/adehecq/ragmac_xdem/pull/59
+        try:
+            outputs = calculate_init_stats_single(dem_path, ref_dem, roi_outlines, all_outlines)
+        except ValueError as e:
+            outputs = [None]*7
         return outputs
 
     # Arguments to be used for the progress bar
@@ -181,6 +189,7 @@ def calculate_init_stats_parallel(
     )
 
     # Save output to file
+    df_stats.dropna(inplace=True)
     df_stats.to_csv(outfile, index=False, float_format="%.2f")
 
     return df_stats
@@ -303,7 +312,7 @@ def spatial_filter_ref_iter(
 
 def postprocessing_single(
     dem_path: str,
-    ref_dem: xdem.DEM,
+    ref_dem_path: str,
     roi_outlines: gu.Vector,
     all_outlines: gu.Vector,
     out_dem_path: str,
@@ -332,8 +341,12 @@ def postprocessing_single(
     :returns: a tuple containing - basename of coregistered DEM, [count of obs, median and NMAD over stable terrain, coverage over roi] before coreg, [same stats] after coreg
     """
     # Load DEM and reproject to ref grid
+    
+    ref_dem = xdem.DEM(ref_dem_path)
     dem = xdem.DEM(dem_path)
-    dem = dem.reproject(ref_dem, resampling="bilinear")
+    ref_dem = ref_dem.reproject(dem,resampling='bilinear')
+
+    
 
     # Create masks
     roi_mask = roi_outlines.create_mask(dem)
@@ -403,7 +416,9 @@ def postprocessing_single(
             plt.close()
 
     # Save coregistered DEM
-    dem_coreg.save(out_dem_path, tiled=True)
+    # project to reference DEM grid for stacking and hole filling later
+    dem_coreg.reproject(xdem.DEM(ref_dem_path,load_data=False),resampling='bilinear').save(out_dem_path,tiled=True)
+    #dem_coreg.save(out_dem_path, tiled=True)
 
     return (
         os.path.basename(dem_path),
@@ -734,12 +749,13 @@ def merge_and_calculate_ddems(groups, validation_dates, ref_dem, mode, outdir, o
             
             dems_list = groups[count]
             dem_dates = utils.get_dems_date(dems_list)
-            
+             
             time_stamps = np.array(matplotlib.dates.date2num(dem_dates))
 #             time_stamps = np.array([utils.date_time_to_decyear(i) for i in dem_dates])
-
-            ds = io.xr_stack_geotifs(dems_list, dem_dates, ref_dem.filename)
+            print("Starting to stack dems")
             
+            ds = io.xr_stack_geotifs(dems_list, dem_dates, ref_dem.filename)
+
             # Find optimal chunking scheme
             
             # Use full dim length in time but chunk x y into something sensible to speed up processing (WIP)
