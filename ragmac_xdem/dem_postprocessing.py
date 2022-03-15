@@ -414,7 +414,7 @@ def postprocessing_single(
 
     # Save coregistered DEM
     # project to reference DEM grid for stacking and hole filling later
-    dem_coreg.reproject(xdem.DEM(ref_dem_path),resampling='bilinear').save(out_dem_path,tiled=True)
+    dem_coreg.reproject(xdem.DEM(ref_dem_path,load_data=False),resampling='bilinear').save(out_dem_path,tiled=True)
     #dem_coreg.save(out_dem_path, tiled=True)
 
     return (
