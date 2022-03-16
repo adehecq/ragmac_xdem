@@ -38,7 +38,7 @@ def dask_start_cluster(nproc, threads=1, ip_addres=None):
     return client
 
 def optimize_dask_chunks(ds,
-                         min_chunk_size = 1, 
+                         min_chunk_size = 1,
                          max_chunk_size = 10):
     """
     Function to optimize shape and size of dask chunk.
@@ -54,9 +54,6 @@ def optimize_dask_chunks(ds,
     t = len(ds.time)
     x = len(ds.x)
     y = len(ds.y)
-    
-    print('\ndata dims: x, y, time')
-    print('data shape:',x,y,t)
     
     #Find something that is close to a multiple of dim length
     multiple_of_x = round(np.sqrt(x))
@@ -83,15 +80,22 @@ def optimize_dask_chunks(ds,
             y -= multiple_of_y
             chunksize = ds['band1'][:t,:y,:x].nbytes / 1048576
     
+    #Round off single digits
     x = 10* int(np.ceil(x/10))
     y = 10* int(np.ceil(y/10))
-    print('chunk shape:', x,y,t)
-    chunksize = ds['band1'][:t,:y,:x].nbytes / 1048576
-    print('chunk size:',np.round(chunksize,2), 'MiB')
-    
-    ds = ds.chunk({"time":t, "x":x, "y":y})
-    
-    return ds
+
+    return x, y, t
+
+def dask_get_mapped_tasks(dask_array):
+    """
+    Finds tasks associated with chunked dask array.
+    """
+    # TODO There has to be a better way to do this...
+    txt = dask_array._repr_html_()
+    idx = txt.find('Tasks')
+    strings = txt[idx-20:idx].split(' ')
+    tasks_count = max([int(i) for i in strings if i.isdigit()])
+    return tasks_count
 
 def stack_geotif_arrays(geotif_files_list):
     """

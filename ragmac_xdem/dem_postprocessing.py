@@ -755,15 +755,48 @@ def merge_and_calculate_ddems(groups, validation_dates, ref_dem, mode, outdir, o
             
     
             ds = io.xr_stack_geotifs(dems_list, dem_dates, ref_dem.filename)
-            ds = io.optimize_dask_chunks(ds,
-                                         min_chunk_size = 1, # MiB
-                                         max_chunk_size = 10)
+            t = len(ds.time)
+            x = len(ds.x)
+            y = len(ds.y)
+            print('\ndata dims: x, y, time')
+            print('data shape:',x,y,t)
+            
+            ## Optimize chunking WIP
+            
+            # option 1
+#             ds['band1'].data = ds['band1'].data.rechunk({0:-1, 1:'auto', 2:'auto'}, 
+#                                                         block_size_limit=1e8, 
+#                                                         balance=True)
+#             arr = ds['band1'].data
+#             t,y,x = arr.chunks[0][0], arr.chunks[1][0], arr.chunks[2][0]
+#             tasks_count = io.dask_get_mapped_tasks(ds['band1'].data)
+            
+            # option 2
+            mx, my, t = io.optimize_dask_chunks(ds)
+            x = mx
+            y = my
+            ds = ds.chunk({"time":t, "x":mx, "y":my})
+            tasks_count = io.dask_get_mapped_tasks(ds['band1'].data)
+            while tasks_count > 10000:
+                # increase chunk shape to reduce tasks
+                x += mx
+                y += my
+                # task_count increases if ds is not re-initialized
+                ds = io.xr_stack_geotifs(dems_list, dem_dates, ref_dem.filename)
+                ds = ds.chunk({"time":t, "x":x, "y":y})
+                tasks_count = io.dask_get_mapped_tasks(ds['band1'].data)
+            
+            # see what we end up with
+            print('chunk shape:', x,y,t)
+            chunksize = ds['band1'][:t,:y,:x].nbytes / 1048576
+            print('chunk size:',np.round(chunksize,2), 'MiB')
+            print('tasks:', tasks_count)
             
             # TODO pass down client object to print address here instead of earlier.
             print('\nCheck dask dashboard to monitor progress. See stdout above for address to dashboard.')
             
             n_thresh = 5
-            print('Excluding pixels with count <',n_thresh)
+            print('\nExcluding pixels with count <',n_thresh)
             results = temporal.dask_apply_linreg(ds['band1'],
                                                  'time', 
                                                  kwargs={'times':time_stamps,
