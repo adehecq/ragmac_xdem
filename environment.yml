@@ -13,6 +13,9 @@ dependencies:
   - opencv
   - oggm
   - oggm-deps
+  - dask
+  - distributed
+  - jupyterlab
   - pip
   # dev requirements
   - pytest
