@@ -752,27 +752,15 @@ def merge_and_calculate_ddems(groups, validation_dates, ref_dem, mode, outdir, o
              
             time_stamps = np.array(matplotlib.dates.date2num(dem_dates))
 #             time_stamps = np.array([utils.date_time_to_decyear(i) for i in dem_dates])
-            print("Starting to stack dems")
             
+    
             ds = io.xr_stack_geotifs(dems_list, dem_dates, ref_dem.filename)
-
-            # Find optimal chunking scheme
-            
-            # Use full dim length in time but chunk x y into something sensible to speed up processing (WIP)
-            t = len(ds.time)
-            x = len(ds.x)
-            y = len(ds.y)
-            print('\ndata dims: x, y, time')
-            print('data shape:', x,y,t)
-            
-            x = utils.roundup(np.sqrt(len(ds.x))*2)
-            y = utils.roundup(np.sqrt(len(ds.y))*2)
-            print('chunk shape:', x,y,t)
+            ds = io.optimize_dask_chunks(ds,
+                                         min_chunk_size = 1, # MiB
+                                         max_chunk_size = 10)
             
             # TODO pass down client object to print address here instead of earlier.
             print('\nCheck dask dashboard to monitor progress. See stdout above for address to dashboard.')
-
-            ds = ds.chunk({"time":t, "x":x, "y":y})
             
             n_thresh = 5
             print('Excluding pixels with count <',n_thresh)
