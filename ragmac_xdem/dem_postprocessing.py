@@ -793,14 +793,20 @@ def merge_and_calculate_ddems(groups, validation_dates, ref_dem, mode, outdir, o
             print('tasks:', tasks_count)
             
             # TODO pass down client object to print address here instead of earlier.
-            print('\nCheck dask dashboard to monitor progress. See stdout above for address to dashboard.')
             
-            n_thresh = 5
-            print('\nExcluding pixels with count <',n_thresh)
+            
+            count_thresh = 5
+            print('\nExcluding pixels with count <',count_thresh)
+            
+            time_delta_min = 5
+            print('Excluding pixels with max time delta <',time_delta_min, 'days')
+            
+            print('\nCheck dask dashboard link printed above to monitor linear regression progress.')
             results = temporal.dask_apply_linreg(ds['band1'],
                                                  'time', 
                                                  kwargs={'times':time_stamps,
-                                                         'n_thresh':n_thresh})
+                                                         'count_thresh':count_thresh,
+                                                         'time_delta_min': time_delta_min})
             
             start = datetime.now()
             results = xr.Dataset({'slope':results[0],
