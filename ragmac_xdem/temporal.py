@@ -520,24 +520,25 @@ def GPR_reshape_parallel_results(results, ma_stack, valid_mask_2D):
     results_stack = np.ma.stack(results_stack)
     return results_stack
 
-def dask_linreg(DataArray, times = None, count_thresh = 5, time_delta_min = 5):
+def dask_linreg(DataArray, times = None, count_thresh = None, time_delta_min = None):
     """
     Apply linear regression to DataArray.
     Returns np.nan if valid pixel count less than count_thresh
     and/or difference between first and last time stamp less than time_delta_min.
     
     Default value for time_delta_min assumes times are provided in days.
-    
     """
     mask = ~np.isnan(DataArray)
     
-    if np.sum(mask) < count_thresh:
-        return np.nan, np.nan
+    if count_thresh:
+        if np.sum(mask) < count_thresh:
+                return np.nan, np.nan
     
-    time_delta = max(times[mask]) - min(times[mask])
-    if time_delta < time_delta_min:
-        return np.nan, np.nan
-    
+    if time_delta_min:
+        time_delta = max(times[mask]) - min(times[mask])
+        if time_delta < time_delta_min:
+            return np.nan, np.nan
+
 #     m = linear_model.LinearRegression()
     m = linear_model.TheilSenRegressor()
     m.fit(times[mask].reshape(-1,1), DataArray[mask])
