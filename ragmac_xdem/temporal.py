@@ -20,6 +20,7 @@ from tqdm import tqdm
 
 import xarray as xr
 import dask
+from dask.diagnostics import ProgressBar
 
 from ragmac_xdem import utils
 
@@ -519,14 +520,28 @@ def GPR_reshape_parallel_results(results, ma_stack, valid_mask_2D):
     results_stack = np.ma.stack(results_stack)
     return results_stack
 
-def dask_linreg(DataArray, times = None, n_thresh = 5):
-    #TODO vectorize with numba
+def dask_linreg(DataArray, times = None, count_thresh = 5, time_delta_min = 5):
+    """
+    Apply linear regression to DataArray.
+    Returns np.nan if valid pixel count less than count_thresh
+    and/or difference between first and last time stamp less than time_delta_min.
+    
+    Default value for time_delta_min assumes times are provided in days.
+    
+    """
     mask = ~np.isnan(DataArray)
-    if np.sum(mask) < n_thresh:
+    
+    if np.sum(mask) < count_thresh:
         return np.nan, np.nan
+    
+    time_delta = max(times[mask]) - min(times[mask])
+    if time_delta < time_delta_min:
+        return np.nan, np.nan
+    
 #     m = linear_model.LinearRegression()
     m = linear_model.TheilSenRegressor()
     m.fit(times[mask].reshape(-1,1), DataArray[mask])
+    
     return m.coef_[0], m.intercept_
 
 def dask_apply_linreg(DataArray, dim, kwargs=None):
@@ -542,4 +557,58 @@ def dask_apply_linreg(DataArray, dim, kwargs=None):
         vectorize=True,
         dask="parallelized",)
     return results
+
+def nmad(DataArray):
+    if np.all(np.isnan(DataArray)):
+        return np.nan
+    else:
+        return 1.4826 * np.nanmedian(np.abs(DataArray - np.nanmedian(DataArray)))
+    
+def count(DataArray):
+    return np.nansum(~np.isnan(DataArray))
+
+def apply_nmad(DataArray):
+    return np.apply_along_axis(nmad,0,DataArray)
+
+def apply_count(DataArray):
+    return np.apply_along_axis(count,0,DataArray)
+
+def dask_apply_func(DataArray, func):
+    result = xr.apply_ufunc(
+        func,
+        DataArray,
+        dask="allowed",)
+    return result
+
+def xr_dask_count(ds):
+    """
+    Computes count along time axis in x, y, time in dask.array.core.Array.
+    
+    Returns xr.DataArray with x, y dims.
+    """
+    with ProgressBar("Computing count"):
+        arr_count = dask_apply_func(ds['band1'].data, apply_count).compute()
+    arr_count = np.ma.masked_where(arr_count==0,arr_count)
+    
+    count_da = ds['band1'].isel(time=0).drop('time')
+    count_da.values = arr_count
+    count_da.name = 'count'
+    
+    return count_da
+    
+def xr_dask_nmad(ds):
+    """
+    Computes NMAD along time axis in x, y, time in dask.array.core.Array.
+    
+    Returns xr.DataArray with x, y dims.
+    """
+    with ProgressBar("Computing nmad"):
+        arr_nmad = dask_apply_func(ds['band1'].data, apply_nmad).compute()
+
+    nmad_da = ds['band1'].isel(time=0).drop('time')
+    nmad_da.values = arr_nmad
+    nmad_da.name   = 'nmad'
+    
+    return nmad_da
+    
     

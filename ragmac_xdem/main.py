@@ -19,6 +19,8 @@ from ragmac_xdem import files
 from ragmac_xdem import mass_balance as mb
 from ragmac_xdem import utils
 from ragmac_xdem import plotting
+from ragmac_xdem import io
+from ragmac_xdem import temporal
 
 # Set parameters for the different runs to be processed
 default_coreg = xdem.coreg.NuthKaab() + xdem.coreg.BiasCorr(bias_func=np.nanmedian)
@@ -127,6 +129,69 @@ def main(case: dict, mode: str, run_name: str, sat_type: str = "ASTER", nproc: i
         mp_method="mp",
     )
     print(f"--> Coregistered DEMs saved in {coreg_dir}")
+    
+    print("\n### Plot coregistration QC figures ###")
+    
+    pair_indexes, pair_ids = utils.list_pairs(validation_dates)
+    for count, pair in enumerate(pair_indexes):
+        
+        start = time()
+
+        k1, k2 = pair
+        dems_list = groups[count]
+        dem_dates = utils.get_dems_date(dems_list)
+        dems_coreg_list = groups_coreg[count]
+        dem_coreg_dates = utils.get_dems_date(dems_coreg_list)
+        pair_id = pair_ids[count]
+        
+        outfig = os.path.join(outdir, pair_id+"_coreg_fig.png")
+        
+        if not os.path.exists(outfig):
+            
+            print('\nCreating coregistration QC figures for period',pair_id)
+
+            block_size_limit = 1e8
+            balance = True
+            print('Stacking raw DEMs',pair_id)
+            dems_ds = io.xr_stack_geotifs(dems_list,dem_dates,ref_dem.filename, save_to_nc=True)
+            dems_ds['band1'].data = dems_ds['band1'].data.rechunk({0:-1, 1:'auto', 2:'auto'}, 
+                                                                  block_size_limit=block_size_limit, 
+                                                                  balance=balance)
+            step0 = time() 
+            print(f"Took {(step0-start)/60:.2f} minutes")
+
+            print('Computing NMAD for raw DEMs stack')
+            nmad_da_before = temporal.xr_dask_nmad(dems_ds)
+            step1 = time() 
+            print(f"Took {(step1-step0)/60:.2f} minutes")
+
+            print('Stacking coregistetered DEMs',pair_id)
+
+            dems_coreg_ds = io.xr_stack_geotifs(dems_coreg_list,dem_coreg_dates,ref_dem.filename, save_to_nc=True)
+            dems_coreg_ds['band1'].data = dems_coreg_ds['band1'].data.rechunk({0:-1, 1:'auto', 2:'auto'}, 
+                                                                  block_size_limit=block_size_limit, 
+                                                                  balance=balance)
+            step2 = time() 
+            print(f"Took {(step2-step1)/60:.2f} minutes")
+
+            print('Computing count and NMAD for coregistetered DEMs stack')
+
+            count_da = temporal.xr_dask_count(dems_coreg_ds)
+            nmad_da_after = temporal.xr_dask_nmad(dems_coreg_ds)
+
+            step3 = time() 
+            print(f"Took {(step3-step2)/60:.2f} minutes")
+
+            outfig = os.path.join(outdir, pair_id+"_coreg_fig.png")
+            print('--> Saving plot to ',outfig)
+            plotting.xr_plot_count_nmad_before_after_coreg(count_da,
+                                                           nmad_da_before, 
+                                                           nmad_da_after,
+                                                           outfig=outfig)
+        else:
+            print('--> Plot already exists at',outfig)
+
+    
 
     # Temporarily downsample DEM for speeding-up process for testing
     if downsampling > 1:

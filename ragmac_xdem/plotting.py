@@ -355,7 +355,6 @@ def plot_timelapse(
     anim = animation.FuncAnimation(fig, vid_animate, init_func=vid_init, frames=array.shape[0], interval=frame_rate)
     return HTML(anim.to_html5_video())
 
-
 def plot_count_std(
     count_nmad_ma_stack,
     count_vmin=1,
@@ -409,7 +408,6 @@ def plot_count_std(
             ax.set_xticks(())
             ax.set_yticks(())
 
-
 def xr_plot_count_std_glacier(
     count_da,
     std_da,
@@ -462,6 +460,7 @@ def xr_plot_count_std_glacier(
             ax.set_yticks(())
 
     for ax in axes:
+        ax.set_aspect('equal')
         ax.set_title("")
         if points:
             (p,) = ax.plot(points[0], points[1], marker="o", color="b", linestyle="none")
@@ -474,6 +473,98 @@ def xr_plot_count_std_glacier(
             ax.set_xlim(glacier_bounds[0], glacier_bounds[2])
             ax.set_ylim(glacier_bounds[1], glacier_bounds[3])
 
+            
+def xr_plot_count_nmad_before_after_coreg(
+    count_da,
+    nmad_da_before,
+    nmad_da_after,
+    glacier_gdf=None,
+    flowline_gdf=None,
+    points=None,
+    plot_to_glacier_extent=False,
+    count_vmin=1,
+    count_vmax=None,
+    count_cmap="gnuplot",
+    nmad_vmin=0,
+    nmad_vmax=None,
+    nmad_cmap="cividis",
+    alpha=None,
+    ticks_off=False,
+    outfig = None,
+):
+    
+    if not count_vmax:
+        count_vmax = np.nanpercentile(count_da.values, 98.0)
+
+    if not nmad_vmax:
+        nmad_vmax = np.nanpercentile(nmad_da_before.values, 98.0)
+        
+    fig, axes = plt.subplots(1, 3, figsize=(20, 10))
+
+    # plot count
+    ax = axes[0]
+    divider = make_axes_locatable(ax)
+    cax = divider.append_axes("right", size="5%", pad=0.05)
+    cmap = plt.cm.get_cmap(count_cmap, count_vmax)
+    norm = matplotlib.colors.Normalize(vmin=count_vmin, vmax=count_vmax)
+    cbar = matplotlib.colorbar.ColorbarBase(cax, cmap=cmap, norm=norm, extend="max", alpha=alpha)
+    count_da.plot(ax=ax, cmap=cmap, add_colorbar=False, alpha=alpha, vmin=count_vmin, vmax=count_vmax)
+    ax.set_title("DEM count", size=12)
+
+    # add legend elements
+    legend_elements = []
+    if isinstance(glacier_gdf, type(gpd.GeoDataFrame())):
+        legend_elements.append(Line2D([0], [0], color="k", label="Glacier Outline"))
+    if isinstance(flowline_gdf, type(gpd.GeoDataFrame())):
+        legend_elements.append(Line2D([0], [0], color="orange", label="Flowlines"))
+    if points:
+        legend_elements.append(Line2D([0], [0], color="b", label="Observations", marker="o", linestyle="none"))
+    if legend_elements:
+        ax.legend(handles=legend_elements, loc="best")
+
+    # plot nmad before coreg
+    ax = axes[1]
+    divider = make_axes_locatable(ax)
+    cax = divider.append_axes("right", size="5%", pad=0.05)
+    cmap = plt.cm.get_cmap(nmad_cmap)
+    norm = matplotlib.colors.Normalize(vmin=nmad_vmin, vmax=nmad_vmax)
+    cbar = matplotlib.colorbar.ColorbarBase(cax, cmap=cmap, norm=norm, extend="max", alpha=alpha)
+    nmad_da_before.plot(ax=ax, cmap=cmap, add_colorbar=False, alpha=alpha, vmin=nmad_vmin, vmax=nmad_vmax)
+    ax.set_title("NMAD before coreg [m]", size=12)
+
+    # plot nmad after coreg
+    ax = axes[2]
+    divider = make_axes_locatable(ax)
+    cax = divider.append_axes("right", size="5%", pad=0.05)
+    cmap = plt.cm.get_cmap(nmad_cmap)
+    norm = matplotlib.colors.Normalize(vmin=nmad_vmin, vmax=nmad_vmax)
+    cbar = matplotlib.colorbar.ColorbarBase(cax, cmap=cmap, norm=norm, extend="max", alpha=alpha)
+    nmad_da_after.plot(ax=ax, cmap=cmap, add_colorbar=False, alpha=alpha, vmin=nmad_vmin, vmax=nmad_vmax)
+    ax.set_title("NMAD after coreg [m]", size=12)
+    
+    if ticks_off:
+        for ax in axes:
+            ax.set_xticks(())
+            ax.set_yticks(())
+
+    for ax in axes:
+        ax.set_aspect('equal')
+        if points:
+            (p,) = ax.plot(points[0], points[1], marker="o", color="b", linestyle="none")
+        if isinstance(glacier_gdf, type(gpd.GeoDataFrame())):
+            glacier_gdf.plot(ax=ax, facecolor="none", legend=True)
+        if isinstance(flowline_gdf, type(gpd.GeoDataFrame())):
+            flowline_gdf.plot(ax=ax, color="orange", legend=True)
+        if plot_to_glacier_extent:
+            glacier_bounds = glacier_gdf.bounds.values[0]
+            ax.set_xlim(glacier_bounds[0], glacier_bounds[2])
+            ax.set_ylim(glacier_bounds[1], glacier_bounds[3])
+            
+    plt.tight_layout()
+    
+    if outfig:
+        plt.savefig(outfig, dpi=200)
+        
 
 ###########  Miscellaneous
 def check_if_number_even(n):
