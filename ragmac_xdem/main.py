@@ -198,7 +198,11 @@ def main(case: dict, mode: str, run_name: str, sat_type: str = "ASTER", nproc: i
                                                                                   filtering=run["filtering"])
             ddems_filled[pair_id] = ddem_filled
         else:
+            ddem_filled = ddems[pair_id]
             ddems_filled[pair_id] = ddems[pair_id]
+            ddem_bins = xdem.volume.hypsometric_binning(ddems[pair_id].data[roi_mask], ref_dem.data[roi_mask])
+            ddem_bins_filled = ddem_bins
+            
         
         # -- Calculating MB -- #
         output_mb, ddems_filled_nmad = mb.calculate_mb(ddems_filled[pair_id], 
@@ -206,35 +210,35 @@ def main(case: dict, mode: str, run_name: str, sat_type: str = "ASTER", nproc: i
                                                        stable_mask)
         
         # Plot
-        if run["gap_filling"]:
-            fig_fn = os.path.join(outdir, f"{pair_id}_mb_fig.png")
+        #if run["gap_filling"]:
+        fig_fn = os.path.join(outdir, f"{pair_id}_mb_fig.png")
 
-            bins_area = xdem.volume.calculate_hypsometry_area(ddem_bins, 
+        bins_area = xdem.volume.calculate_hypsometry_area(ddem_bins, 
                                                               ref_dem.data[roi_mask], 
                                                               pixel_size=ref_dem.res)
-            bin_width = ddem_bins.index.left - ddem_bins.index.right
-            obs_area = ddem_bins["count"] * ref_dem.res[0] * ref_dem.res[1]
-            frac_obs = obs_area / bins_area
+        bin_width = ddem_bins.index.left - ddem_bins.index.right
+        obs_area = ddem_bins["count"] * ref_dem.res[0] * ref_dem.res[1]
+        frac_obs = obs_area / bins_area
 
-            dh_mean = np.nanmean(ddems[pair_id].data[roi_mask])
-            data, mask = gu.spatial_tools.get_array_and_mask(ddems[pair_id])
-            nobs = np.sum(~mask[roi_mask.squeeze()])
-            ntot = np.sum(roi_mask)
-            ddems_roi_coverage = nobs / ntot
+        dh_mean = np.nanmean(ddems[pair_id].data[roi_mask])
+        data, mask = gu.spatial_tools.get_array_and_mask(ddems[pair_id])
+        nobs = np.sum(~mask[roi_mask.squeeze()])
+        ntot = np.sum(roi_mask)
+        ddems_roi_coverage = nobs / ntot
 
-            ddems_filled_dh_mean = output_mb['dh_mean'].values * \
+        ddems_filled_dh_mean = output_mb['dh_mean'].values * \
                                    output_mb['area'].values
-            ddems_filled_dh_mean = np.sum(ddems_filled_dh_mean) / \
+        ddems_filled_dh_mean = np.sum(ddems_filled_dh_mean) / \
                                    np.sum(output_mb['area'].values)
             
-            ddems_filled_dh_mean_err = output_mb['dh_mean_err'].values * \
+        ddems_filled_dh_mean_err = output_mb['dh_mean_err'].values * \
                                        output_mb['area'].values
-            ddems_filled_dh_mean_err = np.sum(ddems_filled_dh_mean_err) / \
+        ddems_filled_dh_mean_err = np.sum(ddems_filled_dh_mean_err) / \
                                        np.sum(output_mb['area'].values)
             
-            run_id = ' '.join([case,mode,run_name])
+        run_id = ' '.join([case,mode,run_name])
 
-            plotting.plot_mb_fig(# hyps curve params
+        plotting.plot_mb_fig(# hyps curve params
                                  ddem_bins, 
                                  ddem_bins_filled, 
                                  bins_area,
