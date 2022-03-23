@@ -15,14 +15,15 @@ import logging
 @author: friedrichknuth
 """
 
-def dask_start_cluster(nproc, threads=1, ip_addres=None):
+def dask_start_cluster(nproc, threads=1, ip_addres=None, port=':8786'):
     """
     Starts a dask cluster. Can provide a custom IP or URL to view the progress dashboard. 
     This may be necessary if working on a remote machine.
     """
     cluster = LocalCluster(n_workers=nproc,
-                       threads_per_worker=threads,
-                       silence_logs=logging.ERROR)
+                           threads_per_worker=threads,
+                           silence_logs=logging.ERROR,
+                           dashboard_address=port)
 
     client = Client(cluster)
     
