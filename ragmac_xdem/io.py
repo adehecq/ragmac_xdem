@@ -37,6 +37,65 @@ def dask_start_cluster(nproc, threads=1, ip_addres=None):
     print('Threads per worker:', threads, '\n')
     return client
 
+def optimize_dask_chunks(ds,
+                         min_chunk_size = 1,
+                         max_chunk_size = 10):
+    """
+    Function to optimize shape and size of dask chunk.
+    Finds square root of dim length, then increments chunk shape 
+    by square root until size > min_chunk_size and < max_chunk_size.
+    Chunk sizes measured in MiB.
+    """
+
+    ### More info at https://blog.dask.org/2021/11/02/choosing-dask-chunk-sizes#what-to-watch-for-on-the-dashboard
+    ### larger chunk sizes (e.g. 100 MiB) performed slower when analyzing the task graph and performance.
+    ### WIP
+    
+    t = len(ds.time)
+    x = len(ds.x)
+    y = len(ds.y)
+    
+    #Find something that is close to a multiple of dim length
+    multiple_of_x = round(np.sqrt(x))
+    while multiple_of_x > 100:
+        multiple_of_x = round(np.sqrt(multiple_of_x))
+        
+    multiple_of_y = round(np.sqrt(y))
+    while multiple_of_y > 100:
+        multiple_of_y = round(np.sqrt(multiple_of_y))
+
+    #Adjust chunk size
+    x = multiple_of_x
+    y = multiple_of_y
+    chunksize = ds['band1'][:t,:y,:x].nbytes / 1048576 # convert to MiB
+
+    if chunksize < min_chunk_size or chunksize > max_chunk_size:
+        while chunksize < min_chunk_size:
+            x += multiple_of_x
+            y += multiple_of_y
+            chunksize = ds['band1'][:t,:y,:x].nbytes / 1048576
+        
+        while chunksize > max_chunk_size:
+            x -= multiple_of_x
+            y -= multiple_of_y
+            chunksize = ds['band1'][:t,:y,:x].nbytes / 1048576
+    
+    #Round off single digits
+    x = 10* int(np.ceil(x/10))
+    y = 10* int(np.ceil(y/10))
+
+    return x, y, t
+
+def dask_get_mapped_tasks(dask_array):
+    """
+    Finds tasks associated with chunked dask array.
+    """
+    # TODO There has to be a better way to do this...
+    txt = dask_array._repr_html_()
+    idx = txt.find('Tasks')
+    strings = txt[idx-20:idx].split(' ')
+    tasks_count = max([int(i) for i in strings if i.isdigit()])
+    return tasks_count
 
 def stack_geotif_arrays(geotif_files_list):
     """
@@ -100,11 +159,18 @@ def xr_read_geotif(geotif_file_path, chunks='auto', masked=True):
     return ds
 
 
-def xr_stack_geotifs(geotif_files_list, datetimes_list, reference_geotif_file, resampling="bilinear", save_to_nc=False):
+def xr_stack_geotifs(geotif_files_list, 
+                     datetimes_list, 
+                     reference_geotif_file, 
+                     resampling="bilinear", 
+                     save_to_nc=False):
 
     """
-    Stack single or multi-band GeoTiFFs in memory to reference_geotiff.
-    Resample as needed.
+    Stack single or multi-band GeoTiFFs to reference_geotiff.
+    Returns out-of-memory dask array, unless resampling occurs.
+    
+    Optionally, set save_to_nc true when resmapling is required to
+    return an out-of-memory dask array.
 
     Inputs
     ----------
@@ -118,6 +184,7 @@ def xr_stack_geotifs(geotif_files_list, datetimes_list, reference_geotif_file, r
     """
 
     ## Check each geotiff has a datetime associated with it.
+    
     if len(datetimes_list) == len(geotif_files_list):
         pass
     else:
@@ -125,7 +192,7 @@ def xr_stack_geotifs(geotif_files_list, datetimes_list, reference_geotif_file, r
         print("datetimes:", len(datetimes_list))
         print("geotifs:", len(geotif_files_list))
         return None
-
+    
     ## Choose resampling method. Defaults to bilinear.
     if isinstance(resampling, type(Resampling.bilinear)):
         resampling = resampling
@@ -144,22 +211,45 @@ def xr_stack_geotifs(geotif_files_list, datetimes_list, reference_geotif_file, r
 
     ## Stack geotifs and dimension in time
     datasets = []
+    nc_files = []
+    out_dirs = []
 
+    c = 0
     for index, file_name in enumerate(geotif_files_list):
         src = xr_read_geotif(file_name)
+        
         if not check_xr_rio_ds_match(src, ref):
-            print("Resampling", file_name, "to", reference_geotif_file)
             src = src.rio.reproject_match(ref, resampling=resampling)
+            c += 1
         src = src.assign_coords({"time": datetimes_list[index]})
         src = src.expand_dims("time")
 
         if save_to_nc:
             out_fn = str(pathlib.Path(file_name).with_suffix("")) + ".nc"
+            pathlib.Path(out_fn).unlink()
             src.to_netcdf(out_fn)
             out_dir = str(pathlib.Path(geotif_files_list[index]).parents[0])
+            nc_files.append(out_fn)
+            out_dirs.append(out_dir)
 
         datasets.append(src)
+    
+    # check if anything was resampled
+    if c != 0:
+        print('Resampled', 
+              c, 
+              'of', 
+              len(geotif_files_list), 
+              'dems to match reference DEM spatial_ref, crs, transform, bounds, and resolution.')
 
+        # Optionally ensure data are returned as dask array.
+        if save_to_nc:
+            print('Saved .nc files alongside input dem .tif files in')
+            for i in list(set(out_dirs)):
+                print(i)
+            
+            return xr.open_mfdataset(nc_files)
+        
     ds = xr.concat(datasets, dim="time", combine_attrs="no_conflicts")
     return ds
 
@@ -181,9 +271,9 @@ def check_xr_rio_ds_match(ds1, ds2):
     if (
         (ds1["spatial_ref"].attrs == ds2["spatial_ref"].attrs)
         & (ds1.rio.crs == ds2.rio.crs)
+        & (ds1.rio.transform() == ds2.rio.transform())
         & (ds1.rio.bounds() == ds2.rio.bounds())
         & (ds1.rio.resolution() == ds2.rio.resolution())
-        & (ds1.rio.transform() == ds2.rio.transform())
     ):
         return True
     else:
