@@ -763,28 +763,28 @@ def merge_and_calculate_ddems(groups, validation_dates, ref_dem, mode, outdir, o
             
             ## Optimize chunking WIP
             
-            # option 1
-#             ds['band1'].data = ds['band1'].data.rechunk({0:-1, 1:'auto', 2:'auto'}, 
-#                                                         block_size_limit=1e8, 
-#                                                         balance=True)
-#             arr = ds['band1'].data
-#             t,y,x = arr.chunks[0][0], arr.chunks[1][0], arr.chunks[2][0]
-#             tasks_count = io.dask_get_mapped_tasks(ds['band1'].data)
-            
-            # option 2
-            mx, my, t = io.optimize_dask_chunks(ds)
-            x = mx
-            y = my
-            ds = ds.chunk({"time":t, "x":mx, "y":my})
+#             Option 1 - use built in method
+            ds['band1'].data = ds['band1'].data.rechunk({0:-1, 1:'auto', 2:'auto'}, 
+                                                        block_size_limit=1e8, 
+                                                        balance=True)
+            arr = ds['band1'].data
+            t,y,x = arr.chunks[0][0], arr.chunks[1][0], arr.chunks[2][0]
             tasks_count = io.dask_get_mapped_tasks(ds['band1'].data)
-            while tasks_count > 10000:
-                # increase chunk shape to reduce tasks
-                x += mx
-                y += my
-                # task_count increases if ds is not re-initialized
-                ds = io.xr_stack_geotifs(dems_list, dem_dates, ref_dem.filename)
-                ds = ds.chunk({"time":t, "x":x, "y":y})
-                tasks_count = io.dask_get_mapped_tasks(ds['band1'].data)
+            
+            # Option 2 - custom method finding balance between chunk shape, size, and task count
+#             mx, my, t = io.optimize_dask_chunks(ds)
+#             x = mx
+#             y = my
+#             ds = ds.chunk({"time":t, "x":mx, "y":my})
+#             tasks_count = io.dask_get_mapped_tasks(ds['band1'].data)
+#             while tasks_count > 10000:
+#                 # increase chunk shape to reduce tasks
+#                 x += mx
+#                 y += my
+#                 # task_count increases if ds is not re-initialized
+#                 ds = io.xr_stack_geotifs(dems_list, dem_dates, ref_dem.filename)
+#                 ds = ds.chunk({"time":t, "x":x, "y":y})
+#                 tasks_count = io.dask_get_mapped_tasks(ds['band1'].data)
             
             # see what we end up with
             print('chunk shape:', x,y,t)
@@ -792,9 +792,15 @@ def merge_and_calculate_ddems(groups, validation_dates, ref_dem, mode, outdir, o
             print('chunk size:',np.round(chunksize,2), 'MiB')
             print('tasks:', tasks_count)
             
+            from pathlib import Path
+            zarr_stack_fn = Path.joinpath(Path(dems_list[0]).parents[0],'stack.zarr')
+            if zarr_stack_fn.exists() and not overwrite:
+                ds.to_zarr(zarr_stack_fn)
+            ds = xr.open_dataset(zarr_stack_fn,
+                                            chunks={'time': t, 'y': y, 'x':x})
+            
             # TODO pass down client object to print address here instead of earlier.
-            
-            
+
             count_thresh = 5
             print('\nExcluding pixels with count <',count_thresh)
             

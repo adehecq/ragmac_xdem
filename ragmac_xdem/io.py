@@ -15,14 +15,15 @@ import logging
 @author: friedrichknuth
 """
 
-def dask_start_cluster(nproc, threads=1, ip_addres=None):
+def dask_start_cluster(nproc, threads=1, ip_addres=None, port=':8786'):
     """
     Starts a dask cluster. Can provide a custom IP or URL to view the progress dashboard. 
     This may be necessary if working on a remote machine.
     """
     cluster = LocalCluster(n_workers=nproc,
-                       threads_per_worker=threads,
-                       silence_logs=logging.ERROR)
+                           threads_per_worker=threads,
+                           silence_logs=logging.ERROR,
+                           dashboard_address=port)
 
     client = Client(cluster)
     
@@ -226,7 +227,7 @@ def xr_stack_geotifs(geotif_files_list,
 
         if save_to_nc:
             out_fn = str(pathlib.Path(file_name).with_suffix("")) + ".nc"
-            pathlib.Path(out_fn).unlink()
+            pathlib.Path(out_fn).unlink(missing_ok=True) #force delete file if exists
             src.to_netcdf(out_fn)
             out_dir = str(pathlib.Path(geotif_files_list[index]).parents[0])
             nc_files.append(out_fn)
