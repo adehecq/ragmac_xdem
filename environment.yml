@@ -15,6 +15,7 @@ dependencies:
   - oggm-deps
   - dask
   - distributed
+  - zarr
   - jupyterlab
   - pip
   # dev requirements
