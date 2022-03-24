@@ -227,7 +227,7 @@ def xr_stack_geotifs(geotif_files_list,
 
         if save_to_nc:
             out_fn = str(pathlib.Path(file_name).with_suffix("")) + ".nc"
-            pathlib.Path(out_fn).unlink()
+            pathlib.Path(out_fn).unlink(missing_ok=True) #force delete file if exists
             src.to_netcdf(out_fn)
             out_dir = str(pathlib.Path(geotif_files_list[index]).parents[0])
             nc_files.append(out_fn)
