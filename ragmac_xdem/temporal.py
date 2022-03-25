@@ -20,7 +20,6 @@ from tqdm import tqdm
 
 import xarray as xr
 import dask
-from dask.diagnostics import ProgressBar
 
 from ragmac_xdem import utils
 
@@ -587,8 +586,7 @@ def xr_dask_count(ds):
     
     Returns xr.DataArray with x, y dims.
     """
-    with ProgressBar("Computing count"):
-        arr_count = dask_apply_func(ds['band1'].data, apply_count).compute()
+    arr_count = dask_apply_func(ds['band1'].data, apply_count).compute()
     arr_count = np.ma.masked_where(arr_count==0,arr_count)
     
     count_da = ds['band1'].isel(time=0).drop('time')
@@ -603,9 +601,7 @@ def xr_dask_nmad(ds):
     
     Returns xr.DataArray with x, y dims.
     """
-    with ProgressBar("Computing nmad"):
-        arr_nmad = dask_apply_func(ds['band1'].data, apply_nmad).compute()
-
+    arr_nmad = dask_apply_func(ds['band1'].data, apply_nmad).compute()
     nmad_da = ds['band1'].isel(time=0).drop('time')
     nmad_da.values = arr_nmad
     nmad_da.name   = 'nmad'
