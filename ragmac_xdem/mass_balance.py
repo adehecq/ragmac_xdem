@@ -92,6 +92,19 @@ def fill_ddem(
 def fill_ddem_local_hypso(ddem, ref_dem, roi_mask, roi_outlines, filtering=True):
     """
     Function to fill gaps in ddems using a local hypsometric approach.
+
+    :param ddem: the ddem to be filled
+    :param ref_dem: a reference elevation used for interpolating all pixels
+    :param roi_mask: a mask of pixels to be interpolated
+    :param roi_outlines: The asscoiated outlines of the ROI
+    :param filtering: if set to False, disable filtering
+
+    :returns:
+    `ddem_filled` gap-filled DEM raster
+    `ddem_bins` the output of hypsometric binning
+    `ddem_bins` same as previous with filtered and interpolated elevation bins,
+    `interp_residuals` the difference between input and interpolated ddem,
+    `frac_obs` the fraction of observation for each feature in roi_outlines
     """
     # Calculate mean elevation change within elevation bins
     # TODO: filter pixels within each bins that are outliers
@@ -109,16 +122,20 @@ def fill_ddem_local_hypso(ddem, ref_dem, roi_mask, roi_outlines, filtering=True)
     # Create 2D filled dDEM
     ddem_filled, interp_residuals = fill_ddem(ddem, ddem_bins_filled, ref_dem, roi_mask)
 
-    # Calculate glacier area within those bins
-#     bins_area = xdem.volume.calculate_hypsometry_area(ddem_bins, ref_dem.data[roi_mask], pixel_size=ref_dem.res)
-#     obs_area = ddem_bins["count"] * ref_dem.res[0] * ref_dem.res[1]
-#     frac_obs = obs_area / bins_area
+    # Calculate fraction of observations for each glacier
+    data, mask = gu.spatial_tools.get_array_and_mask(ddem)
+    frac_obs = np.zeros(len(roi_outlines.ds))
+    for k in roi_outlines.ds.index:
+        # Create mask for selected glacier
+        gl_outline = gu.Vector(roi_outlines.ds.iloc[k: k + 1])
+        gl_mask = gl_outline.create_mask(ddem).squeeze()
 
-    # Calculate total volume change and mean dh
-#     dV = np.sum(ddem_bins_filled["value"].values * bins_area.values) / 1e9  # in km^3
-#     dh_mean = dV * 1e9 / bins_area.sum()
+        # Calculate coverage over glaciers
+        nobs = np.sum(~mask[gl_mask])
+        ntot = np.sum(gl_mask)
+        frac_obs[k] = nobs / ntot
 
-    return ddem_filled, ddem_bins, ddem_bins_filled, interp_residuals
+    return ddem_filled, ddem_bins, ddem_bins_filled, interp_residuals, frac_obs
 
 
 def calculate_mb(ddem_filled, roi_outlines, stable_mask, plot=False):

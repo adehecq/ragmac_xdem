@@ -387,7 +387,7 @@ def main(case: dict, mode: str, run_name: str, sat_type: str = "ASTER", nproc: i
         # -- Interpolate -- #
         
         if run["gap_filling"]:
-            ddem_filled, ddem_bins, ddem_bins_filled, interp_residuals = mb.fill_ddem_local_hypso(
+            ddem_filled, ddem_bins, ddem_bins_filled, interp_residuals, frac_obs = mb.fill_ddem_local_hypso(
                 ddems[pair_id],
                 ref_dem,
                 roi_mask,
@@ -397,7 +397,7 @@ def main(case: dict, mode: str, run_name: str, sat_type: str = "ASTER", nproc: i
             ddems_filled[pair_id] = ddem_filled
         else:
             ddems_filled[pair_id] = ddems[pair_id]
-        
+
         # -- Calculating MB -- #
         output_mb, ddems_filled_nmad = mb.calculate_mb(ddems_filled[pair_id], 
                                                        roi_outlines, 
