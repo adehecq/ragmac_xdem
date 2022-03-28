@@ -53,7 +53,9 @@ if __name__ == "__main__":
         default=mp.cpu_count() - 1,
         help="int, number of processes to be run in parallel whenever possible (Default is max CPU - 1)",
     )
-
+    parser.add_argument(
+        "-qc", dest="qc", action="store_true", help="If set, will produce quality control products"
+    )
     args = parser.parse_args()
 
     # List all possible cases, modes and runs to be processed
@@ -71,12 +73,10 @@ if __name__ == "__main__":
     if args.run is not None:
         all_runs = [args.run]
         
-    if args.mode == "TimeSeries3":
-        # Need to launch cluster in main script
-        from ragmac_xdem import temporal
-        # TODO add ip_address as an input option.
-        ip_addres=None
-        client = io.dask_start_cluster(args.nproc, ip_addres=ip_addres)
+    # TODO add ip_address as an input option.
+    # Launch cluster for out-of-memory computation on large arrays.
+    ip_addres=None
+    client = io.dask_start_cluster(args.nproc, ip_addres=ip_addres)
 
     nruns = len(all_cases) * len(all_modes) * len(all_runs)
     print(f"## Total of {nruns} runs to be processed ##")
@@ -90,7 +90,7 @@ if __name__ == "__main__":
 
                 print(f"\n\n##### Running case {case}, mode {mode} and run {run} #####\n\n")
                 try:
-                    main.main(case, mode, run, sat_type=args.sat_type, nproc=args.nproc, overwrite=args.overwrite)
+                    main.main(case, mode, run, sat_type=args.sat_type, nproc=args.nproc, overwrite=args.overwrite, qc=args.qc)
                 except:
                     print("ERROR -> skipping run")
                     traceback.print_exc()

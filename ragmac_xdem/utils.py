@@ -414,6 +414,3 @@ def xr_extract_ma_arrays_at_coords(da, x_coords, y_coords):
         ma_arrays.append(np.ma.masked_invalid(sub.values))
     ma_stack = np.ma.stack(ma_arrays, axis=1)
     return ma_stack
-
-def roundup(x,level=10):
-    return int(np.ceil(x / level)) * level
