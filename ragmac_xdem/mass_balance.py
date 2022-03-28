@@ -138,7 +138,7 @@ def fill_ddem_local_hypso(ddem, ref_dem, roi_mask, roi_outlines, filtering=True)
     return ddem_filled, ddem_bins, ddem_bins_filled, interp_residuals, frac_obs
 
 
-def calculate_mb(ddem_filled, roi_outlines, stable_mask, plot=False):
+def calculate_mb(ddem_filled, roi_outlines, stable_mask, ddem_raw, plot=False):
     """
     Calculate mean elevation change and volume change for all features in roi_outlines, along with uncertainties.
 
@@ -153,13 +153,17 @@ def calculate_mb(ddem_filled, roi_outlines, stable_mask, plot=False):
     if (np.sum(dh_subset.mask) > 0) or (np.sum(~np.isfinite(dh_subset.data)) > 0):
         warnings.warn("dDEM contains gaps in ROI - mean value will be biased")
 
-    rgi_ids = roi_outlines.ds.RGIId
-    dh_means, dh_spat_errs, areas = [], [], []
+    # Get mask of valid observations
+    _, obs_mask = gu.spatial_tools.get_array_and_mask(ddem_raw)
 
-    for gid in tqdm(rgi_ids, desc="Looping through all glaciers"):
+    # Variables to be extracted during loop
+    nfeatures = len(roi_outlines.ds)
+    dh_means, dh_spat_errs, areas, frac_obs = np.zeros((4, nfeatures))
+
+    for k in tqdm(roi_outlines.ds.index, desc="Looping through all glaciers"):
 
         # Create mask for selected glacier
-        gl_outline = gu.Vector(roi_outlines.ds.loc[rgi_ids == gid])
+        gl_outline = gu.Vector(roi_outlines.ds.iloc[k: k + 1])
         gl_mask = gl_outline.create_mask(ddem_filled)
 
         # Temporarily plot
@@ -191,15 +195,15 @@ def calculate_mb(ddem_filled, roi_outlines, stable_mask, plot=False):
         # Calculate spatially correlated error
         dh_spat_err = err.err_500m_vario(nmad, area)  # err.compute_mean_dh_error(gl_mask, dh_err, vgm_params, res=ddem_filled.res[0])
 
-        # Save to output lists
-        dh_means.append(dh_mean)  # m
-        dh_spat_errs.append(dh_spat_err)
-        areas.append(area / 1e6)  # km2
+        # Calculate fraction of valid observations
+        nobs = np.sum(~obs_mask[gl_mask.squeeze()])
+        ntot = np.sum(gl_mask)
+        frac_obs[k] = nobs / ntot
 
-    # Convert outputs to numpy arrays
-    dh_means = np.array(dh_means)
-    dh_spat_errs = np.array(dh_spat_errs)
-    areas = np.array(areas)
+        # Save to output lists
+        dh_means[k] = dh_mean  # m
+        dh_spat_errs[k] = dh_spat_err
+        areas[k] = area / 1e6  # km2
 
     # Calculate volume change
     volumes = dh_means / 1e3 * areas  # km3
@@ -209,13 +213,15 @@ def calculate_mb(ddem_filled, roi_outlines, stable_mask, plot=False):
     area_err = err.err_area_buffer(roi_outlines, buffer=30, plot=False)
 
     # Final error, calculated for volume in km3 rather than dh, according to RAGMAC expected outputs
-    dV_spat_err = dh_spat_errs * areas / 1e3
+    dV_spat_err = frac_obs * dh_spat_errs * areas / 1e3
+    dV_interp_err = 5 * (1 - frac_obs) * dh_spat_errs * areas / 1e3
     dV_area_err = np.abs(dh_means) * area_err * areas / 1e3
-    dV_interp_err = np.zeros_like(dV_area_err)
     dV_temporal_err = np.zeros_like(dV_area_err)
     dV_err = np.sqrt(dV_spat_err**2 + dV_area_err**2 + dV_interp_err**2 + dV_temporal_err**2)
     dh_err = dV_err / areas * 1e3
 
+    # Save to data frame
+    rgi_ids = roi_outlines.ds.RGIId
     out_df = pd.DataFrame(
         data=np.vstack([rgi_ids, areas, dh_means, dh_err, volumes, dV_err, area_err, dV_spat_err, dV_area_err, dV_interp_err, dV_temporal_err]).T,
         columns=["RGIId", "area", "dh_mean", "dh_mean_err", "dV", "dV_err", "area_err", "dV_spat_err", "dV_area_err", "dV_interp_err", "dV_temporal_err"]

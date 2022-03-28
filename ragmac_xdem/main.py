@@ -401,7 +401,8 @@ def main(case: dict, mode: str, run_name: str, sat_type: str = "ASTER", nproc: i
         # -- Calculating MB -- #
         output_mb, ddems_filled_nmad = mb.calculate_mb(ddems_filled[pair_id], 
                                                        roi_outlines, 
-                                                       stable_mask)
+                                                       stable_mask,
+                                                       ddems[pair_id])
         
         # Plot
         if run["gap_filling"]:
