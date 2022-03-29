@@ -45,7 +45,7 @@ def ddem_bins_filtering(
     if nmad_fact > 0:
         outliers = np.abs(
             ddem_bins_filtered["value"] - np.median(ddem_bins_filtered["value"])
-        ) > 5 * xdem.spatialstats.nmad(ddem_bins_filtered["value"])
+        ) > nmad_fact * xdem.spatialstats.nmad(ddem_bins_filtered["value"])
         ddem_bins_filtered.loc[outliers, "value"] = np.nan
         if verbose:
             print(f"Remove {np.sum(outliers)} outliers by NMAD filter")
