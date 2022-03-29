@@ -643,7 +643,7 @@ def merge_and_calculate_ddems(groups, validation_dates, ref_dem, mode, outdir, o
                 pair_id = f"{date1[:4]}_{date2[:4]}"  # year1_year2
                 ddems[pair_id] = mosaics[date2] - mosaics[date1]
 
-    elif mode == "shean":
+    elif mode == "TimeSeries":
         
         for count, pair in enumerate(pair_indexes):
             k1, k2 = pair
@@ -844,7 +844,7 @@ def merge_and_calculate_ddems(groups, validation_dates, ref_dem, mode, outdir, o
             ddems[pair_id] = dyear * slope
 
     else:
-        raise NotImplementedError("`mode` must be either of 'median', 'shean', 'TimeSeries2, or TimeSeries3'")
+        raise NotImplementedError("`mode` must be either of 'median', 'TimeSeries', 'TimeSeries2, or TimeSeries3'")
 
     # Convert masked arrays to gu.Raster
     for key in list(ddems.keys()):
