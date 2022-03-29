@@ -23,7 +23,7 @@ from ragmac_xdem import io
 from ragmac_xdem import temporal
 
 # Set parameters for the different runs to be processed
-default_coreg = xdem.coreg.NuthKaab() + xdem.coreg.BiasCorr(bias_func=np.nanmedian)
+default_coreg = xdem.coreg.NuthKaab() + xdem.coreg.Deramp(degree=1) + xdem.coreg.BiasCorr(bias_func=np.nanmedian)
 
 runs = {
     "CTL": {"coreg_method": default_coreg, "filtering": True, "coreg_dir": "coreg1_filter1", "gap_filling": True},
@@ -83,7 +83,7 @@ def main(case: dict, mode: str, run_name: str, sat_type: str = "ASTER", nproc: i
         downsampling = 1
         merge_opts = {"mode": "TimeSeries3"}
     else:
-        raise ValueError("`mode` must be either of 'median', 'shean', TimeSeries2 or TimeSeries3'")
+        raise ValueError("`mode` must be either of 'DEMdiff_autoselect', 'DEMdiff_median', 'TimeSeries', 'TimeSeries2' or 'TimeSeries3'")
 
     # Get run parameters
     run = runs[run_name]
@@ -387,19 +387,22 @@ def main(case: dict, mode: str, run_name: str, sat_type: str = "ASTER", nproc: i
         # -- Interpolate -- #
         
         if run["gap_filling"]:
-            ddem_filled, ddem_bins, ddem_bins_filled = mb.fill_ddem_local_hypso(ddems[pair_id], 
-                                                                                  ref_dem, 
-                                                                                  roi_mask, 
-                                                                                  roi_outlines, 
-                                                                                  filtering=run["filtering"])
+            ddem_filled, ddem_bins, ddem_bins_filled, interp_residuals, frac_obs = mb.fill_ddem_local_hypso(
+                ddems[pair_id],
+                ref_dem,
+                roi_mask,
+                roi_outlines,
+                filtering=run["filtering"]
+            )
             ddems_filled[pair_id] = ddem_filled
         else:
             ddems_filled[pair_id] = ddems[pair_id]
-        
+
         # -- Calculating MB -- #
         output_mb, ddems_filled_nmad = mb.calculate_mb(ddems_filled[pair_id], 
                                                        roi_outlines, 
-                                                       stable_mask)
+                                                       stable_mask,
+                                                       ddems[pair_id])
         
         # Plot
         if run["gap_filling"]:
@@ -461,6 +464,8 @@ def main(case: dict, mode: str, run_name: str, sat_type: str = "ASTER", nproc: i
             f"Glacier {largest.RGIId} - Volume change: {largest.dV:.2f} +/- {largest.dV_err:.2f} km3 - mean dh: {largest.dh_mean:.2f} +/- {largest.dh_mean_err:.2f} m"
         )
 
+        # -- Save results to file -- #
+
         # Add other inputs necessary for RAGMAC report
         output_mb["run_code"] = np.array([run_name], dtype="U10").repeat(len(output_mb))
         output_mb["method"] = np.array(
@@ -475,7 +480,7 @@ def main(case: dict, mode: str, run_name: str, sat_type: str = "ASTER", nproc: i
         output_mb["start_date"] = start_date_str
         output_mb["end_date"] = end_date_str
 
-        # Save to csv
+        # Save results to csv
         ragmac_headers = [
             "glacier_id",
             "run_code",
@@ -505,6 +510,35 @@ def main(case: dict, mode: str, run_name: str, sat_type: str = "ASTER", nproc: i
                 "dh_mean_err",
                 "dV",
                 "dV_err",
+            ],
+            index=False,
+            header=ragmac_headers,
+            na_rep='nan'
+        )
+
+        # Save errors to csv
+        ragmac_headers = [
+            "glacier_id",
+            "run_code",
+            "dV_sigma_km3",
+            "dh_sigma_km3",
+            "S_sigma_km3",
+            "voidfill_sigma_km3",
+            "temporal_sigma_km3",
+        ]
+        errors_file = os.path.join(outdir, f"xdem_{case}_{year1}_{year2}_{mode}_errors.csv")
+
+        print(f"Saving errors to file {errors_file}\n")
+        output_mb.to_csv(
+            errors_file,
+            columns=[
+                "RGIId",
+                "run_code",
+                "dV_err",
+                "dV_spat_err",
+                "dV_area_err",
+                "dV_interp_err",
+                "dV_temporal_err"
             ],
             index=False,
             header=ragmac_headers,

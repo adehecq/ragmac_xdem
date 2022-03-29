@@ -403,6 +403,67 @@ def get_uncertainty_function(
     return err_func
 
 
+def fit_vgm(
+    dh: gu.Raster,
+    stable_mask: np.ndarray,
+    nranges: int = 1,
+    plot: bool = False,
+    nproc: int = 1,
+) -> list:
+    """
+    Function to calculate a multi-nested variogram model of elevation error (in stable areas).
+    This is needed to calculate the 2-sigma uncertainty in elevation change averaged over any given area.
+
+    :param dh: the elevation change raster
+    :param stable_mask: a mask of same shape as dh, set to True over known stable pixels
+    :param nranges: the number of sperical models/ranges to be fit to the empirical variogram, must be 1 or 2
+    :param plot: set to True to display intermediate plots
+    :param nproc: number of parallel processes to be used
+
+    :returns: A list containing, for each model, (range, model name, sill)
+    """
+    if nranges not in [1, 2]:
+        raise ValueError("`nranges` must be 1 or 2")
+
+    # Remove values on unstable terrain and large outliers
+    dh_arr, mask = gu.spatial_tools.get_array_and_mask(dh)
+    dh_arr[~stable_mask.squeeze()] = np.nan
+    dh_arr[np.abs(dh_arr) > 4 * xdem.spatialstats.nmad(dh_arr)] = np.nan
+
+    # -- Estimate spatial variance of the error, using variogram --#
+
+    # Calculate empirical variogram
+    df_vgm = xdem.spatialstats.sample_empirical_variogram(
+        values=dh_arr.squeeze(), gsd=dh.res[0], subsample=100, runs=30, n_variograms=5, n_jobs=nproc
+    )
+
+    # Remove pairs distant more than 2/3 the scene size, because they are undersampled
+    df_vgm_filtered = df_vgm[df_vgm.bins < np.max(df_vgm.bins) / 1.5]
+
+    # Fit spherical model(s)
+    if nranges == 1:
+        fun, params = xdem.spatialstats.fit_sum_model_variogram(["Sph", ], empirical_variogram=df_vgm_filtered,)
+        print(f"First spherical model - range: {params[0]:.0f} m - sill: {params[1]:.2f}")
+        vgm_params = [(params[0], "Sph", params[1])]
+
+    elif nranges == 2:
+        fun, params = xdem.spatialstats.fit_sum_model_variogram(["Sph", "Sph"], empirical_variogram=df_vgm_filtered)
+        print(f"First spherical model - range: {params[0]:.0f} m - sill: {params[1]:.2f}")
+        print(f"Second spherical model - range: {params[2]:.0f} m - sill: {params[3]:.2f}")
+        vgm_params = [(params[0], "Sph", params[1]), (params[2], "Sph", params[3])]
+
+    if plot:
+        xdem.spatialstats.plot_vgm(
+            df_vgm,
+            xscale_range_split=[100, 1000, 10000],
+            list_fit_fun=[fun],
+            list_fit_fun_label=["Standardized double-range variogram"],
+        )
+        plt.show()
+
+    return vgm_params
+
+
 def err_500m_vario(nmad, area):
     """
     Scale the dh mean error (NMAD) for an averaging zone of size area (in m2) and assuming spatial correlations 
@@ -411,3 +472,34 @@ def err_500m_vario(nmad, area):
     neff = xdem.spatialstats.neff_circ(area, [[500, "Sph", 1.0], ])
     err = nmad / np.sqrt(neff)
     return err
+
+
+def err_area_buffer(roi_outlines, buffer=30, plot=False):
+    """
+    Calculate the fractional area uncertainty, estimated by adding a buffer around known outlines.
+    Default is 30 m buffer (2-sigma).
+    """
+    # Create new GeoDataFrame with buffered polygons
+    out_gdf = roi_outlines.ds.copy()
+    out_gdf.geometry = roi_outlines.ds.buffer(buffer)
+
+    # Calculate relative error in area
+    area_err = (out_gdf.area - roi_outlines.ds.area) / roi_outlines.ds.area
+
+    # Plot
+    if plot:
+        out_gdf['area_err'] = area_err * 100
+
+        fig = plt.figure(figsize=(8, 6))
+        ax1 = plt.subplot(111)
+        out_gdf.plot(ax=ax1, column='area_err', legend=True, cmap='Reds', vmax=np.percentile(out_gdf['area_err'], 90))
+        ax1.set_title('Area error (%)')
+
+        # ax2 = plt.subplot(122)
+        # out_gdf.plot(ax=ax2, column='dh_err', legend=True, cmap='Reds', vmax=np.percentile(out_gdf['dh_err'], 90))
+        # ax2.set_title('Mean dh error (m)')
+
+        plt.tight_layout()
+        plt.show()
+
+    return area_err

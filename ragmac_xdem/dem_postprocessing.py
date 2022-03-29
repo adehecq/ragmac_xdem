@@ -340,13 +340,10 @@ def postprocessing_single(
 
     :returns: a tuple containing - basename of coregistered DEM, [count of obs, median and NMAD over stable terrain, coverage over roi] before coreg, [same stats] after coreg
     """
-    # Load DEM and reproject to ref grid
-    
+    # Load DEM and reproject to source DEM grid
     ref_dem = xdem.DEM(ref_dem_path)
     dem = xdem.DEM(dem_path)
-    ref_dem = ref_dem.reproject(dem,resampling='bilinear')
-
-    
+    ref_dem = ref_dem.reproject(dem, resampling='bilinear')
 
     # Create masks
     roi_mask = roi_outlines.create_mask(dem)
@@ -358,24 +355,31 @@ def postprocessing_single(
     # Filter gross outliers in stable terrain
     inlier_mask = nmad_filter(ddem.data, stable_mask, verbose=False)
     outlier_mask = ~inlier_mask & stable_mask
-    ddem.data.mask[outlier_mask] = True
-    del inlier_mask
 
-    # Calculate coverage on and off ice
-    roi_coverage_orig, nstable_orig, med_orig, nmad_orig = calculate_stats(ddem, roi_mask, stable_mask)
+    # Exclude steep slopes for coreg
+    slope = xdem.terrain.slope(ref_dem)
+    inlier_mask[slope.data > 50] = False
+
+    # Calculate dDEM statistics on pixels used for coreg
+    ddem_inlier = ddem.copy()
+    ddem_inlier.data.mask[outlier_mask] = True
+    roi_coverage_orig, nstable_orig, med_orig, nmad_orig = calculate_stats(ddem_inlier, roi_mask, stable_mask)
+    del ddem_inlier
 
     # Coregister to reference - Note: this will spread NaN
     # Better strategy: calculate shift, update transform, resample
     if isinstance(coreg_method, xdem.coreg.Coreg):
-        # coreg_method = xdem.coreg.NuthKaab() + xdem.coreg.BiasCorr(bias_func=np.nanmedian)
-        coreg_method.fit(ref_dem, dem, stable_mask, verbose=verbose)
+        coreg_method.fit(ref_dem, dem, inlier_mask, verbose=verbose)
         dem_coreg = coreg_method.apply(dem, dilate_mask=False)
     elif coreg_method is None:
         dem_coreg = dem
     ddem_coreg = dem_coreg - ref_dem
 
     # Calculate new stats
-    roi_coverage_coreg, nstable_coreg, med_coreg, nmad_coreg = calculate_stats(ddem_coreg, roi_mask, stable_mask)
+    ddem_coreg_inlier = ddem_coreg.copy()
+    ddem_coreg_inlier.data.mask[outlier_mask] = True
+    roi_coverage_coreg, nstable_coreg, med_coreg, nmad_coreg = calculate_stats(ddem_coreg_inlier, roi_mask, stable_mask)
+    del ddem_coreg_inlier
 
     # Filter outliers based on reference DEM
     if filtering:
@@ -387,26 +391,29 @@ def postprocessing_single(
     else:
         nfiltered = 0
 
+    ddem_filtered = dem_coreg - ref_dem
+    roi_coverage_filt, nstable_filt, med_filt, nmad_filt = calculate_stats(ddem_filtered, roi_mask, stable_mask)
+    
     # Save plots
     if plot:
-        plt.figure(figsize=(11, 5))
+        plt.figure(figsize=(16, 5))
 
-        ax1 = plt.subplot(121)
+        ax1 = plt.subplot(131)
         plt.imshow(ddem.data.squeeze(), cmap="coolwarm_r", vmin=-50, vmax=50)
         cb = plt.colorbar()
         cb.set_label("Elevation change (m)")
-        plt.title(f"Before coreg - med = {med_orig:.2f} m - NMAD = {nmad_orig:.2f} m")
+        plt.title(f"Before coreg (inliers) - med = {med_orig:.2f} m - NMAD = {nmad_orig:.2f} m", fontsize=10)
 
-        ax2 = plt.subplot(122, sharex=ax1, sharey=ax1)
+        ax2 = plt.subplot(132, sharex=ax1, sharey=ax1)
         plt.imshow(ddem_coreg.data.squeeze(), cmap="coolwarm_r", vmin=-50, vmax=50)
         cb = plt.colorbar()
         cb.set_label("Elevation change (m)")
-        plt.title(f"After coreg - med = {med_coreg:.2f} m - NMAD = {nmad_coreg:.2f} m")
+        plt.title(f"After coreg (inliers) - med = {med_coreg:.2f} m - NMAD = {nmad_coreg:.2f} m", fontsize=10)
 
-        # ax3 = plt.subplot(133, sharex=ax1, sharey=ax1)
-        # plt.imshow(diff_filtered.squeeze(), cmap="coolwarm_r", vmin=-50, vmax=50)
-        # plt.colorbar()
-        # plt.title(f"After filtering - NMAD = {nmad_filtered:.2f} m")
+        ax3 = plt.subplot(133, sharex=ax1, sharey=ax1)
+        plt.imshow(ddem_filtered.data.squeeze(), cmap="coolwarm_r", vmin=-50, vmax=50)
+        plt.colorbar()
+        plt.title(f"After filtering (all) - med = {med_filt:.2f} m - NMAD = {nmad_filt:.2f} m", fontsize=10)
 
         plt.tight_layout()
         if out_fig is None:

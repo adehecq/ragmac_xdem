@@ -12,12 +12,25 @@ rm -f $outfile  # To avoid appending to existing file
 
 
 # Archive all subfolders
+# for exp in experiment_1 experiment_2
+# do
+
+#     for dir in results_*
+#     do
+# 	cmd="tar --append --file=$outfile $exp/*/$dir"
+# 	echo $cmd; `$cmd`
+#     done
+# done
+
+# echo -e "Saved to $outdir/$outfile"
+
+
 for exp in experiment_1 experiment_2
 do
 
-    for dir in results_*
+    for dir in $exp/*/*
     do
-	cmd="tar --append --file=$outfile $exp/*/$dir"
+	cmd="tar --append --file=$outfile $dir"
 	echo $cmd; `$cmd`
     done
 done
