@@ -221,9 +221,9 @@ def dems_selection(
     :returns: List containing lists of DEM paths for each validation date. Same length as validation dates, or as the number of possible pair combinations for mode 'subperiod'.
     """
     # Remove DEMs with less than 1000 valid points, which may fail during coreg
+    # Remove DEMs with no pixel over ROI
     # modified to avoid conflict if init stats failed for edgecase DEM
-     
-    mask = init_stats["nstable_orig"] > 1e3
+    mask = (init_stats["nstable_orig"] > 1e3) & (init_stats["roi_cover_orig"] != 0)
     dem_path_list = init_stats[mask]["dem_path"].values
     #dem_path_list = dem_path_list[init_stats["nstable_orig"] > 1e3]
 
