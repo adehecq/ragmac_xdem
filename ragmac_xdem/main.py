@@ -157,71 +157,54 @@ def main(case: dict, mode: str, run_name: str, sat_type: str = "ASTER", nproc: i
                 print('\nCreating coregistration QC figures for period',pair_id)
                 
                 zarr_stack_fn = Path.joinpath(Path(dems_list[0]).parents[0],'stack.zarr')
+                zarr_stack_tmp_fn = Path.joinpath(Path(dems_list[0]).parents[0],'stack_tmp.zarr')
+                shutil.rmtree(zarr_stack_tmp_fn, ignore_errors=True)
+                shutil.rmtree(zarr_stack_fn, ignore_errors=True)
 
-                if zarr_stack_fn.exists() and not overwrite:
-                    print('Found existing zarr stack at')
-                    print(str(zarr_stack_fn))
-                    dems_ds = xr.open_dataset(zarr_stack_fn, chunks='auto',engine='zarr')
+                print('Stacking raw DEMs',pair_id)
+                dems_ds = io.xr_stack_geotifs(dems_list,dem_dates,ref_dem.filename, save_to_nc=True)
+                nc_files = list(Path(dems_list[0]).parents[0].glob('*.nc'))
 
-                else:
-                    nc_files = list(Path(dems_list[0]).parents[0].glob('*.nc'))
-                    if len(nc_files) == len(dems_list):
-                        print('Found', len(nc_files), '.nc files for', len(dems_list), '.tif files')
-                        dems_ds = xr.open_mfdataset(nc_files, parallel=True)
-                    else:
-                        print('Stacking raw DEMs',pair_id)
-                        dems_ds = io.xr_stack_geotifs(dems_list,dem_dates,ref_dem.filename, save_to_nc=True)
-                        nc_files = list(Path(dems_list[0]).parents[0].glob('*.nc'))
+                ## Optimize chunking 
+                t = len(dems_ds.time)
+                x = len(dems_ds.x)
+                y = len(dems_ds.y)
+                print('\ndata dims: x, y, time')
+                print('data shape:',x,y,t)
 
+                dems_ds['band1'].data = dems_ds['band1'].data.rechunk({0:-1, 1:'auto', 2:'auto'}, 
+                                                                      block_size_limit=1e8, 
+                                                                      balance=True)
+                arr = dems_ds['band1'].data
+                t,y,x = arr.chunks[0][0], arr.chunks[1][0], arr.chunks[2][0]
+                tasks_count = io.dask_get_mapped_tasks(dems_ds['band1'].data)
 
-                    ## Optimize chunking 
-                    t = len(dems_ds.time)
-                    x = len(dems_ds.x)
-                    y = len(dems_ds.y)
-                    print('\ndata dims: x, y, time')
-                    print('data shape:',x,y,t)
+                print('chunk shape:', x,y,t)
+                chunksize = dems_ds['band1'][:t,:y,:x].nbytes / 1048576
+                print('chunk size:',np.round(chunksize,2), 'MiB')
+                print('tasks:', tasks_count)
 
-                    dems_ds['band1'].data = dems_ds['band1'].data.rechunk({0:-1, 1:'auto', 2:'auto'}, 
-                                                                          block_size_limit=1e8, 
-                                                                          balance=True)
-                    arr = dems_ds['band1'].data
-                    t,y,x = arr.chunks[0][0], arr.chunks[1][0], arr.chunks[2][0]
-                    tasks_count = io.dask_get_mapped_tasks(dems_ds['band1'].data)
+                ## Save to zarr
+                print('Saving zarr stack to')
+                print(str(zarr_stack_fn))
 
-                    print('chunk shape:', x,y,t)
-                    chunksize = dems_ds['band1'][:t,:y,:x].nbytes / 1048576
-                    print('chunk size:',np.round(chunksize,2), 'MiB')
-                    print('tasks:', tasks_count)
+                dems_ds = xr.open_mfdataset(nc_files,parallel=True)
+                dems_ds = dems_ds.drop(['spatial_ref']) 
+                dems_ds.to_zarr(zarr_stack_tmp_fn)
+                dems_ds = xr.open_dataset(zarr_stack_tmp_fn,
+                                          chunks={'time': t, 'y': y, 'x':x},engine='zarr')
 
-                    ## Save to zarr
-                    print('Saving zarr stack to')
-                    print(str(zarr_stack_fn))
+                dems_ds['band1'].encoding = {'chunks': (t, y, x)}
+                dems_ds.to_zarr(zarr_stack_fn)
+                dems_ds = xr.open_dataset(zarr_stack_fn,
+                                          chunks={'time': t, 'y': y, 'x':x},engine='zarr')
 
-                    zarr_stack_tmp_fn = Path.joinpath(Path(dems_list[0]).parents[0],'stack_tmp.zarr')
-
-                    shutil.rmtree(zarr_stack_tmp_fn, ignore_errors=True)
-                    shutil.rmtree(zarr_stack_fn, ignore_errors=True)
-
-                    dems_ds = xr.open_mfdataset(nc_files,parallel=True)
-                    dems_ds = dems_ds.drop(['spatial_ref']) 
-                    dems_ds.to_zarr(zarr_stack_tmp_fn)
-                    dems_ds = xr.open_dataset(zarr_stack_tmp_fn,
-                                              chunks={'time': t, 'y': y, 'x':x},engine='zarr')
-
-                    dems_ds['band1'].encoding = {'chunks': (t, y, x)}
-                    dems_ds.to_zarr(zarr_stack_fn)
-                    dems_ds = xr.open_dataset(zarr_stack_fn,
-                                              chunks={'time': t, 'y': y, 'x':x},engine='zarr')
-
-                    # cleanup the nc files
-                    print('removing nc files')
-                    for f in Path(dems_list[0]).parents[0].glob('*.nc'):
-                        f.unlink(missing_ok=True)
+                print('removing nc files')
+                for f in Path(dems_list[0]).parents[0].glob('*.nc'):
+                    f.unlink(missing_ok=True)
 
                 step = time() 
                 print(f"Took {(step-start)/60:.2f} minutes")
-                
-        
 
                 print('Computing NMAD for raw DEMs stack')
                 nmad_da_before = temporal.xr_dask_nmad(dems_ds)
@@ -234,66 +217,50 @@ def main(case: dict, mode: str, run_name: str, sat_type: str = "ASTER", nproc: i
 
                 print('Stacking coregistetered DEMs',pair_id)
                 zarr_stack_coreg_fn = Path.joinpath(Path(dems_coreg_list[0]).parents[0],'stack.zarr')
+                zarr_stack_coreg_tmp_fn = Path.joinpath(Path(dems_coreg_list[0]).parents[0],'stack_tmp.zarr')
+                shutil.rmtree(zarr_stack_coreg_fn, ignore_errors=True)
+                shutil.rmtree(zarr_stack_coreg_tmp_fn, ignore_errors=True)
+                
+                dems_coreg_ds = io.xr_stack_geotifs(dems_coreg_list,dem_coreg_dates,ref_dem.filename, save_to_nc=True)
+                nc_files = list(Path(dems_coreg_list[0]).parents[0].glob('*.nc'))
 
-                if zarr_stack_coreg_fn.exists() and not overwrite:
-                    print('Found existing zarr stack at')
-                    print(str(zarr_stack_coreg_fn))
-                    dems_coreg_ds = xr.open_dataset(zarr_stack_coreg_fn,chunks='auto',engine='zarr')
+                ## Optimize chunking 
+                t = len(dems_coreg_ds.time)
+                x = len(dems_coreg_ds.x)
+                y = len(dems_coreg_ds.y)
+                print('\ndata dims: x, y, time')
+                print('data shape:',x,y,t)
 
-                else:
-                    nc_files = list(Path(dems_coreg_list[0]).parents[0].glob('*.nc'))
-                    if len(nc_files) == len(dems_coreg_list):
-                        print('Found', len(nc_files), '.nc files for', len(dems_coreg_list), '.tif files')
-                        dems_coreg_ds = xr.open_mfdataset(nc_files, parallel=True)
-                    else:
-                        dems_coreg_ds = io.xr_stack_geotifs(dems_coreg_list,dem_coreg_dates,ref_dem.filename, save_to_nc=True)
-                        nc_files = list(Path(dems_coreg_list[0]).parents[0].glob('*.nc'))
+                dems_coreg_ds['band1'].data = dems_coreg_ds['band1'].data.rechunk({0:-1, 1:'auto', 2:'auto'}, 
+                                                                      block_size_limit=1e8, 
+                                                                      balance=True)
+                arr = dems_coreg_ds['band1'].data
+                t,y,x = arr.chunks[0][0], arr.chunks[1][0], arr.chunks[2][0]
+                tasks_count = io.dask_get_mapped_tasks(dems_coreg_ds['band1'].data)
 
+                print('chunk shape:', x,y,t)
+                chunksize = dems_coreg_ds['band1'][:t,:y,:x].nbytes / 1048576
+                print('chunk size:',np.round(chunksize,2), 'MiB')
+                print('tasks:', tasks_count)
 
-                    ## Optimize chunking 
-                    t = len(dems_coreg_ds.time)
-                    x = len(dems_coreg_ds.x)
-                    y = len(dems_coreg_ds.y)
-                    print('\ndata dims: x, y, time')
-                    print('data shape:',x,y,t)
+                ## Save to zarr
+                print('Saving zarr stack to')
+                print(str(zarr_stack_coreg_fn))
 
-                    dems_coreg_ds['band1'].data = dems_coreg_ds['band1'].data.rechunk({0:-1, 1:'auto', 2:'auto'}, 
-                                                                          block_size_limit=1e8, 
-                                                                          balance=True)
-                    arr = dems_coreg_ds['band1'].data
-                    t,y,x = arr.chunks[0][0], arr.chunks[1][0], arr.chunks[2][0]
-                    tasks_count = io.dask_get_mapped_tasks(dems_coreg_ds['band1'].data)
+                dems_coreg_ds = xr.open_mfdataset(nc_files,parallel=True)
+                dems_coreg_ds = dems_coreg_ds.drop(['spatial_ref']) 
+                dems_coreg_ds.to_zarr(zarr_stack_coreg_tmp_fn)
+                dems_coreg_ds = xr.open_dataset(zarr_stack_coreg_tmp_fn,
+                                          chunks={'time': t, 'y': y, 'x':x},engine='zarr')
 
-                    print('chunk shape:', x,y,t)
-                    chunksize = dems_coreg_ds['band1'][:t,:y,:x].nbytes / 1048576
-                    print('chunk size:',np.round(chunksize,2), 'MiB')
-                    print('tasks:', tasks_count)
+                dems_coreg_ds['band1'].encoding = {'chunks': (t, y, x)}
+                dems_coreg_ds.to_zarr(zarr_stack_coreg_fn)
+                dems_coreg_ds = xr.open_dataset(zarr_stack_coreg_fn,
+                                          chunks={'time': t, 'y': y, 'x':x},engine='zarr')
 
-                    ## Save to zarr
-                    print('Saving zarr stack to')
-                    print(str(zarr_stack_coreg_fn))
-
-                    zarr_stack_coreg_tmp_fn = Path.joinpath(Path(dems_coreg_list[0]).parents[0],'stack_tmp.zarr')
-                    
-                    shutil.rmtree(zarr_stack_coreg_fn, ignore_errors=True)
-                    shutil.rmtree(zarr_stack_coreg_tmp_fn, ignore_errors=True)
-
-                    dems_coreg_ds = xr.open_mfdataset(nc_files,parallel=True)
-                    dems_coreg_ds = dems_coreg_ds.drop(['spatial_ref']) 
-                    dems_coreg_ds.to_zarr(zarr_stack_coreg_tmp_fn)
-                    dems_coreg_ds = xr.open_dataset(zarr_stack_coreg_tmp_fn,
-                                              chunks={'time': t, 'y': y, 'x':x},engine='zarr')
-
-                    dems_coreg_ds['band1'].encoding = {'chunks': (t, y, x)}
-                    dems_coreg_ds.to_zarr(zarr_stack_coreg_fn)
-                    dems_coreg_ds = xr.open_dataset(zarr_stack_coreg_fn,
-                                              chunks={'time': t, 'y': y, 'x':x},engine='zarr')
-
-
-                    # cleanup the nc files
-                    print('removing nc files')
-                    for f in Path(dems_coreg_list[0]).parents[0].glob('*.nc'):
-                        f.unlink(missing_ok=True)
+                print('removing nc files')
+                for f in Path(dems_coreg_list[0]).parents[0].glob('*.nc'):
+                    f.unlink(missing_ok=True)
 
                 start = step
                 step = time() 
@@ -308,6 +275,7 @@ def main(case: dict, mode: str, run_name: str, sat_type: str = "ASTER", nproc: i
                 step = time() 
                 print(f"Took {(step-start)/60:.2f} minutes")
 
+                # Plot final figure
                 outfig = os.path.join(outdir, pair_id+"_coreg_fig.png")
                 print('--> Saving plot to ',outfig)
                 plotting.xr_plot_count_nmad_before_after_coreg(count_da,
