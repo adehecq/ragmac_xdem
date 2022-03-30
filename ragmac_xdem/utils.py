@@ -221,9 +221,9 @@ def dems_selection(
     :returns: List containing lists of DEM paths for each validation date. Same length as validation dates, or as the number of possible pair combinations for mode 'subperiod'.
     """
     # Remove DEMs with less than 1000 valid points, which may fail during coreg
+    # Remove DEMs with no pixel over ROI
     # modified to avoid conflict if init stats failed for edgecase DEM
-     
-    mask = init_stats["nstable_orig"] > 1e3
+    mask = (init_stats["nstable_orig"] > 1e3) & (init_stats["roi_cover_orig"] != 0)
     dem_path_list = init_stats[mask]["dem_path"].values
     #dem_path_list = dem_path_list[init_stats["nstable_orig"] > 1e3]
 
@@ -303,7 +303,7 @@ def get_start_end_dates(groups, merge_mode, validation_dates):
             start_date[pair_id] = np.min(get_dems_date(groups[k1]))
             end_date[pair_id] = np.max(get_dems_date(groups[k2]))
 
-    elif (merge_mode == "shean") or (merge_mode == "TimeSeries2") or (merge_mode == "TimeSeries3"):
+    elif (merge_mode == "TimeSeries") or (merge_mode == "TimeSeries2") or (merge_mode == "TimeSeries3"):
 
         for count, pair in enumerate(pair_indexes):
             k1, k2 = pair
@@ -312,7 +312,7 @@ def get_start_end_dates(groups, merge_mode, validation_dates):
             end_date[pair_id] = np.max(get_dems_date(groups[k1]))
             
     else:
-        raise ValueError("`merge_mode` must be either of 'median', 'shean', TimeSeries2 or TimeSeries3'")
+        raise ValueError("`merge_mode` must be either of 'median', 'TimeSeries', TimeSeries2 or TimeSeries3'")
 
     return start_date, end_date
 

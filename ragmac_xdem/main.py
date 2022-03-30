@@ -73,7 +73,7 @@ def main(case: dict, mode: str, run_name: str, sat_type: str = "ASTER", nproc: i
     elif mode == "TimeSeries":
         selection_opts = {"mode": "subperiod", "dt": 365}
         downsampling = 1
-        merge_opts = {"mode": "shean"}
+        merge_opts = {"mode": "TimeSeries"}
     elif mode == "TimeSeries2":
         selection_opts = {"mode": "subperiod", "dt": 365}
         downsampling = 1

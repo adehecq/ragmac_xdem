@@ -45,7 +45,10 @@ def calculate_stats(ddem, roi_mask, stable_mask):
     # Calculate coverage over glaciers
     nobs = np.sum(~mask[roi_mask])
     ntot = np.sum(roi_mask)
-    roi_coverage = nobs / ntot
+    if ntot != 0:
+        roi_coverage = nobs / ntot
+    else:
+        roi_coverage = 0
 
     # Calculate statistics in stable terrain
     nstable = np.sum(~mask[stable_mask])
@@ -74,14 +77,20 @@ def calculate_init_stats_single(
     :returns: a tuple containing - basename of DEM, path to DEM, count of obs, median and NMAD over stable terrain, coverage over roi
     """
     # Load DEM and reproject to ref grid
+    # It is important to use reference grid here, to calculate stats over all the ROI.
     ref_dem = xdem.DEM(ref_dem_path)
     dem = xdem.DEM(dem_path)
-    ref_dem = ref_dem.reproject(dem,resampling='bilinear')
-    
+    dem = dem.reproject(ref_dem, resampling='bilinear')
 
     # Create masks
-    roi_mask = roi_outlines.create_mask(dem)
-    stable_mask = ~all_outlines.create_mask(dem)
+    try:
+        roi_mask = roi_outlines.create_mask(dem)
+    except ValueError:  # in case there is no overlap between outlines and dem
+        roi_mask = np.zeros(dem.data.shape, dtype='bool')
+    try:
+        stable_mask = ~all_outlines.create_mask(dem)
+    except ValueError:  # in case there is no overlap between outlines and dem
+        stable_mask = np.ones(dem.data.shape, dtype='bool')
 
     # Calculate dDEM
     ddem = dem - ref_dem
@@ -189,7 +198,7 @@ def calculate_init_stats_parallel(
     )
 
     # Save output to file
-    df_stats.dropna(inplace=True)
+    # df_stats.dropna(inplace=True)
     df_stats.to_csv(outfile, index=False, float_format="%.2f")
 
     return df_stats
@@ -643,7 +652,7 @@ def merge_and_calculate_ddems(groups, validation_dates, ref_dem, mode, outdir, o
                 pair_id = f"{date1[:4]}_{date2[:4]}"  # year1_year2
                 ddems[pair_id] = mosaics[date2] - mosaics[date1]
 
-    elif mode == "shean":
+    elif mode == "TimeSeries":
         
         for count, pair in enumerate(pair_indexes):
             k1, k2 = pair
@@ -844,7 +853,7 @@ def merge_and_calculate_ddems(groups, validation_dates, ref_dem, mode, outdir, o
             ddems[pair_id] = dyear * slope
 
     else:
-        raise NotImplementedError("`mode` must be either of 'median', 'shean', 'TimeSeries2, or TimeSeries3'")
+        raise NotImplementedError("`mode` must be either of 'median', 'TimeSeries', 'TimeSeries2, or TimeSeries3'")
 
     # Convert masked arrays to gu.Raster
     for key in list(ddems.keys()):
