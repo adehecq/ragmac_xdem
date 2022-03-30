@@ -156,7 +156,6 @@ def main(case: dict, mode: str, run_name: str, sat_type: str = "ASTER", nproc: i
             if not os.path.exists(outfig) or overwrite:
                 print('\nCreating coregistration QC figures for period',pair_id)
                 
-                print('Stacking raw DEMs',pair_id)
                 zarr_stack_fn = Path.joinpath(Path(dems_list[0]).parents[0],'stack.zarr')
 
                 if zarr_stack_fn.exists() and not overwrite:

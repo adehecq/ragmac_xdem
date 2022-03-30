@@ -798,6 +798,10 @@ def merge_and_calculate_ddems(groups, validation_dates, ref_dem, mode, outdir, o
                 ds['band1'].encoding = {'chunks': (t, y, x)}
                 ds.to_zarr(zarr_stack_fn)
                 shutil.rmtree(zarr_stack_tmp_fn, ignore_errors=True)
+                
+            print('removing nc files')
+            for f in Path(dems_list[0]).parents[0].glob('*.nc'):
+                f.unlink(missing_ok=True)
             
             ds = xr.open_dataset(zarr_stack_fn,
                                  chunks={'time': t, 'y': y, 'x':x},engine='zarr')
@@ -838,6 +842,8 @@ def merge_and_calculate_ddems(groups, validation_dates, ref_dem, mode, outdir, o
             date2_dt = datetime.strptime(date2, "%Y-%m-%d")
             dyear = (date2_dt - date1_dt).total_seconds() / (3600 * 24 * 365.25)
             ddems[pair_id] = dyear * slope
+            
+            
 
     else:
         raise NotImplementedError("`mode` must be either of 'median', 'shean', 'TimeSeries2, or TimeSeries3'")
