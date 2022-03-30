@@ -266,7 +266,7 @@ def main(case: dict, mode: str, run_name: str, sat_type: str = "ASTER", nproc: i
                 step = time() 
                 print(f"Took {(step-start)/60:.2f} minutes")
 
-                print('Computing count and NMAD for coregistetered DEMs stack')
+                print('Computing count and NMAD for coregistered DEMs stack')
 
                 count_da = temporal.xr_dask_count(dems_coreg_ds)
                 nmad_da_after = temporal.xr_dask_nmad(dems_coreg_ds)
