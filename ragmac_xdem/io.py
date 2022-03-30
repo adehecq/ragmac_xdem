@@ -189,7 +189,7 @@ def xr_stack_geotifs(geotif_files_list,
     if len(datetimes_list) == len(geotif_files_list):
         pass
     else:
-        print("length of datetimes does not latch length of GeoTIF file list")
+        print("length of datetimes does not match length of GeoTIFF list")
         print("datetimes:", len(datetimes_list))
         print("geotifs:", len(geotif_files_list))
         return None

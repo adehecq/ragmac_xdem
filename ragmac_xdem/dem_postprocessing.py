@@ -22,6 +22,8 @@ from skimage.morphology import disk
 from tqdm import tqdm
 import matplotlib
 import xarray as xr
+from pathlib import Path
+import shutil
 
 from ragmac_xdem import io, temporal, utils
 
@@ -769,8 +771,9 @@ def merge_and_calculate_ddems(groups, validation_dates, ref_dem, mode, outdir, o
             time_stamps = np.array(matplotlib.dates.date2num(dem_dates))
 #             time_stamps = np.array([utils.date_time_to_decyear(i) for i in dem_dates])
             
-    
-            ds = io.xr_stack_geotifs(dems_list, dem_dates, ref_dem.filename)
+            ds = io.xr_stack_geotifs(dems_list, dem_dates, ref_dem.filename, save_to_nc=True)
+            nc_files = list(Path(dems_list[0]).parents[0].glob('*.nc'))
+        
             t = len(ds.time)
             x = len(ds.x)
             y = len(ds.y)
@@ -778,45 +781,39 @@ def merge_and_calculate_ddems(groups, validation_dates, ref_dem, mode, outdir, o
             print('data shape:',x,y,t)
             
             ## Optimize chunking WIP
-            
-#             Option 1 - use built in method
             ds['band1'].data = ds['band1'].data.rechunk({0:-1, 1:'auto', 2:'auto'}, 
                                                         block_size_limit=1e8, 
                                                         balance=True)
             arr = ds['band1'].data
             t,y,x = arr.chunks[0][0], arr.chunks[1][0], arr.chunks[2][0]
             tasks_count = io.dask_get_mapped_tasks(ds['band1'].data)
-            
-            # Option 2 - custom method finding balance between chunk shape, size, and task count
-#             mx, my, t = io.optimize_dask_chunks(ds)
-#             x = mx
-#             y = my
-#             ds = ds.chunk({"time":t, "x":mx, "y":my})
-#             tasks_count = io.dask_get_mapped_tasks(ds['band1'].data)
-#             while tasks_count > 10000:
-#                 # increase chunk shape to reduce tasks
-#                 x += mx
-#                 y += my
-#                 # task_count increases if ds is not re-initialized
-#                 ds = io.xr_stack_geotifs(dems_list, dem_dates, ref_dem.filename)
-#                 ds = ds.chunk({"time":t, "x":x, "y":y})
-#                 tasks_count = io.dask_get_mapped_tasks(ds['band1'].data)
-            
-            # see what we end up with
-            print('chunk shape:', x,y,t)
             chunksize = ds['band1'][:t,:y,:x].nbytes / 1048576
+            print('chunk shape:', x,y,t)
             print('chunk size:',np.round(chunksize,2), 'MiB')
             print('tasks:', tasks_count)
             
-            from pathlib import Path
             zarr_stack_fn = Path.joinpath(Path(dems_list[0]).parents[0],'stack.zarr')
-            if zarr_stack_fn.exists() and not overwrite:
-                ds.to_zarr(zarr_stack_fn)
-            ds = xr.open_dataset(zarr_stack_fn,
-                                            chunks={'time': t, 'y': y, 'x':x})
+            zarr_stack_tmp_fn = Path.joinpath(Path(dems_list[0]).parents[0],'stack_tmp.zarr')
+            shutil.rmtree(zarr_stack_fn, ignore_errors=True)
+            shutil.rmtree(zarr_stack_tmp_fn, ignore_errors=True)
             
-            # TODO pass down client object to print address here instead of earlier.
-
+            print('Saving zarr stack to')
+            print(zarr_stack_fn)
+ 
+            ds = xr.open_mfdataset(nc_files,parallel=True)
+            ds = ds.drop(['spatial_ref']) 
+            ds.to_zarr(zarr_stack_tmp_fn)
+            ds = xr.open_dataset(zarr_stack_tmp_fn,
+                                 chunks={'time': t, 'y': y, 'x':x},engine='zarr')
+            ds['band1'].encoding = {'chunks': (t, y, x)}
+            ds.to_zarr(zarr_stack_fn)
+                
+            print('removing nc files')
+            for f in Path(dems_list[0]).parents[0].glob('*.nc'):
+                f.unlink(missing_ok=True)
+            
+            ds = xr.open_dataset(zarr_stack_fn,
+                                 chunks={'time': t, 'y': y, 'x':x},engine='zarr')
             count_thresh = 5
             print('\nExcluding pixels with count <',count_thresh)
             
@@ -829,8 +826,7 @@ def merge_and_calculate_ddems(groups, validation_dates, ref_dem, mode, outdir, o
                                                  'time', 
                                                  kwargs={'times':time_stamps,
                                                          'count_thresh':count_thresh,
-                                                         'time_delta_min': None})
-            
+                                                         'time_delta_min': time_delta_min})
             start = datetime.now()
             results = xr.Dataset({'slope':results[0],
                                   'intercept':results[1]}).compute()
@@ -851,6 +847,10 @@ def merge_and_calculate_ddems(groups, validation_dates, ref_dem, mode, outdir, o
             date2_dt = datetime.strptime(date2, "%Y-%m-%d")
             dyear = (date2_dt - date1_dt).total_seconds() / (3600 * 24 * 365.25)
             ddems[pair_id] = dyear * slope
+            
+            shutil.rmtree(zarr_stack_fn, ignore_errors=True)
+            shutil.rmtree(zarr_stack_tmp_fn, ignore_errors=True)
+            
 
     else:
         raise NotImplementedError("`mode` must be either of 'median', 'TimeSeries', 'TimeSeries2, or TimeSeries3'")

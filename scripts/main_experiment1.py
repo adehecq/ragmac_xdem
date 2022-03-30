@@ -69,11 +69,10 @@ if __name__ == "__main__":
 
     if args.mode is not None:
         all_modes = [args.mode]
-        
-    # TODO add ip_address as an input option.
-    # Launch cluster for out-of-memory computation on large arrays.
-    ip_addres=None
-    client = io.dask_start_cluster(args.nproc, ip_addres=ip_addres)
+    
+    if args.qc or args.mode == "TimeSeries3":
+        # Launch dask cluster for computation on larger than memory arrays.
+        client = io.dask_start_cluster(args.nproc)
         
     nruns = len(all_cases) * len(all_modes)
     print(f"## Total of {nruns} runs to be processed ##")
