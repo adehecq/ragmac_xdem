@@ -802,11 +802,13 @@ def merge_and_calculate_ddems(groups, validation_dates, ref_dem, mode, outdir, o
             print(zarr_stack_tmp_fn)
             ds = ds.drop(['spatial_ref']) 
             ds.to_zarr(zarr_stack_tmp_fn)
-            # check metadata
+            print('Zarr file info')
             source_group = zarr.open(zarr_stack_tmp_fn)
             source_array = source_group['band1']
             print(source_group.tree())
             print(source_array.info)
+            del source_group
+            del source_array
             
             print('Removing temporary nc files')
             for f in Path(dems_list[0]).parents[0].glob('*.nc'):
@@ -818,11 +820,14 @@ def merge_and_calculate_ddems(groups, validation_dates, ref_dem, mode, outdir, o
                                  chunks={'time': t, 'y': y, 'x':x},engine='zarr')
             ds['band1'].encoding = {'chunks': (t, y, x)}
             ds.to_zarr(zarr_stack_fn)
+            print('Zarr file info')
             source_group = zarr.open(zarr_stack_fn)
             source_array = source_group['band1']
             print(source_group.tree())
             print(source_array.info)
-            
+            del source_group
+            del source_array
+                
             print('Removing temporary zarr stack')
             shutil.rmtree(zarr_stack_tmp_fn, ignore_errors=True)
             

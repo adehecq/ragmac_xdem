@@ -194,7 +194,7 @@ def main(case: dict, mode: str, run_name: str, sat_type: str = "ASTER", nproc: i
                 dems_ds = xr.open_mfdataset(nc_files,parallel=True)
                 dems_ds = dems_ds.drop(['spatial_ref']) 
                 dems_ds.to_zarr(zarr_stack_tmp_fn)
-                # check metadata
+                print('Zarr file info')
                 source_group = zarr.open(zarr_stack_tmp_fn)
                 source_array = source_group['band1']
                 print(source_group.tree())
@@ -212,7 +212,7 @@ def main(case: dict, mode: str, run_name: str, sat_type: str = "ASTER", nproc: i
                                           chunks={'time': t, 'y': y, 'x':x},engine='zarr')
                 dems_ds['band1'].encoding = {'chunks': (t, y, x)}
                 dems_ds.to_zarr(zarr_stack_fn)
-                # check metadata
+                print('Zarr file info')
                 source_group = zarr.open(zarr_stack_fn)
                 source_array = source_group['band1']
                 print(source_group.tree())
@@ -270,7 +270,7 @@ def main(case: dict, mode: str, run_name: str, sat_type: str = "ASTER", nproc: i
                 print(str(zarr_stack_coreg_tmp_fn))
                 dems_coreg_ds = dems_coreg_ds.drop(['spatial_ref']) 
                 dems_coreg_ds.to_zarr(zarr_stack_coreg_tmp_fn)
-                # check metadata
+                print('Zarr file info')
                 source_group = zarr.open(zarr_stack_coreg_tmp_fn)
                 source_array = source_group['band1']
                 print(source_group.tree())
@@ -288,7 +288,7 @@ def main(case: dict, mode: str, run_name: str, sat_type: str = "ASTER", nproc: i
                                           chunks={'time': t, 'y': y, 'x':x},engine='zarr')
                 dems_coreg_ds['band1'].encoding = {'chunks': (t, y, x)}
                 dems_coreg_ds.to_zarr(zarr_stack_coreg_fn)
-                # check metadata
+                print('Zarr file info')
                 source_group = zarr.open(zarr_stack_coreg_fn)
                 source_array = source_group['band1']
                 print(source_group.tree())
