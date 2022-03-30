@@ -13,6 +13,9 @@ import numpy as np
 import geoutils as gu
 import xdem
 from mpl_toolkits.axes_grid1 import make_axes_locatable
+import shutil
+from pathlib import Path
+import xarray as xr
 
 import ragmac_xdem.dem_postprocessing as pproc
 from ragmac_xdem import files
@@ -151,12 +154,9 @@ def main(case: dict, mode: str, run_name: str, sat_type: str = "ASTER", nproc: i
 
 
             if not os.path.exists(outfig) or overwrite:
-                import shutil
-                from pathlib import Path
-                import xarray as xr
-
                 print('\nCreating coregistration QC figures for period',pair_id)
-
+                
+                print('Stacking raw DEMs',pair_id)
                 zarr_stack_fn = Path.joinpath(Path(dems_list[0]).parents[0],'stack.zarr')
 
                 if zarr_stack_fn.exists() and not overwrite:
@@ -198,7 +198,7 @@ def main(case: dict, mode: str, run_name: str, sat_type: str = "ASTER", nproc: i
                     print('Saving zarr stack to')
                     print(str(zarr_stack_fn))
 
-                    zarr_stack_tmp_fn = Path.joinpath(Path(dems_coreg_list[0]).parents[0],'stack_tmp.zarr')
+                    zarr_stack_tmp_fn = Path.joinpath(Path(dems_list[0]).parents[0],'stack_tmp.zarr')
 
                     shutil.rmtree(zarr_stack_tmp_fn, ignore_errors=True)
                     shutil.rmtree(zarr_stack_fn, ignore_errors=True)

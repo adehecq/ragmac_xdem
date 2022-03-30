@@ -22,6 +22,8 @@ from skimage.morphology import disk
 from tqdm import tqdm
 import matplotlib
 import xarray as xr
+from pathlib import Path
+import shutil
 
 from ragmac_xdem import io, temporal, utils
 
@@ -742,9 +744,6 @@ def merge_and_calculate_ddems(groups, validation_dates, ref_dem, mode, outdir, o
     elif mode == "TimeSeries3":
 
         for count, pair in enumerate(pair_indexes):
-            from pathlib import Path
-            import shutil
-            
             k1, k2 = pair
             dems_list = groups[count]
             pair_id = pair_ids[count]
@@ -756,13 +755,7 @@ def merge_and_calculate_ddems(groups, validation_dates, ref_dem, mode, outdir, o
             time_stamps = np.array(matplotlib.dates.date2num(dem_dates))
 #             time_stamps = np.array([utils.date_time_to_decyear(i) for i in dem_dates])
             
-    
-            nc_files = list(Path(dems_list[0]).parents[0].glob('*.nc'))
-            if nc_files:
-                save_to_nc = False
-            else:
-                save_to_nc = True
-            ds = io.xr_stack_geotifs(dems_list, dem_dates, ref_dem.filename, save_to_nc=save_to_nc)
+            ds = io.xr_stack_geotifs(dems_list, dem_dates, ref_dem.filename, save_to_nc=True)
             nc_files = list(Path(dems_list[0]).parents[0].glob('*.nc'))
         
             t = len(ds.time)
