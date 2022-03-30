@@ -778,26 +778,19 @@ def merge_and_calculate_ddems(groups, validation_dates, ref_dem, mode, outdir, o
             
             zarr_stack_fn = Path.joinpath(Path(dems_list[0]).parents[0],'stack.zarr')
             zarr_stack_tmp_fn = Path.joinpath(Path(dems_list[0]).parents[0],'stack_tmp.zarr')
-            print('Saving zarr stack to')
-            print(zarr_stack_fn)
-            
-            
             shutil.rmtree(zarr_stack_fn, ignore_errors=True)
             shutil.rmtree(zarr_stack_tmp_fn, ignore_errors=True)
             
-            
-            if overwrite or not zarr_stack_fn.exists():
-                shutil.rmtree(zarr_stack_fn, ignore_errors=True)
-                shutil.rmtree(zarr_stack_tmp_fn, ignore_errors=True)
-                
-                ds = xr.open_mfdataset(nc_files,parallel=True)
-                ds = ds.drop(['spatial_ref']) 
-                ds.to_zarr(zarr_stack_tmp_fn)
-                ds = xr.open_dataset(zarr_stack_tmp_fn,
-                                     chunks={'time': t, 'y': y, 'x':x},engine='zarr')
-                ds['band1'].encoding = {'chunks': (t, y, x)}
-                ds.to_zarr(zarr_stack_fn)
-                shutil.rmtree(zarr_stack_tmp_fn, ignore_errors=True)
+            print('Saving zarr stack to')
+            print(zarr_stack_fn)
+ 
+            ds = xr.open_mfdataset(nc_files,parallel=True)
+            ds = ds.drop(['spatial_ref']) 
+            ds.to_zarr(zarr_stack_tmp_fn)
+            ds = xr.open_dataset(zarr_stack_tmp_fn,
+                                 chunks={'time': t, 'y': y, 'x':x},engine='zarr')
+            ds['band1'].encoding = {'chunks': (t, y, x)}
+            ds.to_zarr(zarr_stack_fn)
                 
             print('removing nc files')
             for f in Path(dems_list[0]).parents[0].glob('*.nc'):
@@ -805,9 +798,6 @@ def merge_and_calculate_ddems(groups, validation_dates, ref_dem, mode, outdir, o
             
             ds = xr.open_dataset(zarr_stack_fn,
                                  chunks={'time': t, 'y': y, 'x':x},engine='zarr')
-
-            # TODO pass down client object to print address here instead of earlier.
-
             count_thresh = 5
             print('\nExcluding pixels with count <',count_thresh)
             
@@ -821,7 +811,6 @@ def merge_and_calculate_ddems(groups, validation_dates, ref_dem, mode, outdir, o
                                                  kwargs={'times':time_stamps,
                                                          'count_thresh':count_thresh,
                                                          'time_delta_min': time_delta_min})
-            
             start = datetime.now()
             results = xr.Dataset({'slope':results[0],
                                   'intercept':results[1]}).compute()
@@ -843,6 +832,8 @@ def merge_and_calculate_ddems(groups, validation_dates, ref_dem, mode, outdir, o
             dyear = (date2_dt - date1_dt).total_seconds() / (3600 * 24 * 365.25)
             ddems[pair_id] = dyear * slope
             
+            shutil.rmtree(zarr_stack_fn, ignore_errors=True)
+            shutil.rmtree(zarr_stack_tmp_fn, ignore_errors=True)
             
 
     else:
