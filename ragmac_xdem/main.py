@@ -158,8 +158,9 @@ def main(case: dict, mode: str, run_name: str, sat_type: str = "ASTER", nproc: i
                 
                 zarr_stack_fn = Path.joinpath(Path(dems_list[0]).parents[0],'stack.zarr')
                 zarr_stack_tmp_fn = Path.joinpath(Path(dems_list[0]).parents[0],'stack_tmp.zarr')
-                shutil.rmtree(zarr_stack_tmp_fn, ignore_errors=True)
+
                 shutil.rmtree(zarr_stack_fn, ignore_errors=True)
+                shutil.rmtree(zarr_stack_tmp_fn, ignore_errors=True)
 
                 print('Stacking raw DEMs',pair_id)
                 dems_ds = io.xr_stack_geotifs(dems_list,dem_dates,ref_dem.filename, save_to_nc=True)
@@ -282,6 +283,12 @@ def main(case: dict, mode: str, run_name: str, sat_type: str = "ASTER", nproc: i
                                                                nmad_da_before, 
                                                                nmad_da_after,
                                                                outfig=outfig)
+                
+                shutil.rmtree(zarr_stack_fn, ignore_errors=True)
+                shutil.rmtree(zarr_stack_tmp_fn, ignore_errors=True)
+                shutil.rmtree(zarr_stack_coreg_fn, ignore_errors=True)
+                shutil.rmtree(zarr_stack_coreg_tmp_fn, ignore_errors=True)
+
 
             else:
                 print('--> Plot already exists at',outfig)
