@@ -247,7 +247,6 @@ def main(case: dict, mode: str, run_name: str, sat_type: str = "ASTER", nproc: i
                         print('Found', len(nc_files), '.nc files for', len(dems_coreg_list), '.tif files')
                         dems_coreg_ds = xr.open_mfdataset(nc_files, parallel=True)
                     else:
-                        print('Stacking coreg DEMs',pair_id)
                         dems_coreg_ds = io.xr_stack_geotifs(dems_coreg_list,dem_coreg_dates,ref_dem.filename, save_to_nc=True)
                         nc_files = list(Path(dems_coreg_list[0]).parents[0].glob('*.nc'))
 
@@ -292,10 +291,10 @@ def main(case: dict, mode: str, run_name: str, sat_type: str = "ASTER", nproc: i
                                               chunks={'time': t, 'y': y, 'x':x},engine='zarr')
 
 
-#                     # cleanup the nc files
-#                     print('removing nc files')
-#                     for f in Path(dems_coreg_list[0]).parents[0].glob('*.nc'):
-#                         f.unlink(missing_ok=True)
+                    # cleanup the nc files
+                    print('removing nc files')
+                    for f in Path(dems_coreg_list[0]).parents[0].glob('*.nc'):
+                        f.unlink(missing_ok=True)
 
                 start = step
                 step = time() 
