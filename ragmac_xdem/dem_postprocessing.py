@@ -757,7 +757,12 @@ def merge_and_calculate_ddems(groups, validation_dates, ref_dem, mode, outdir, o
 #             time_stamps = np.array([utils.date_time_to_decyear(i) for i in dem_dates])
             
     
-            ds = io.xr_stack_geotifs(dems_list, dem_dates, ref_dem.filename)
+            nc_files = list(Path(dems_list[0]).parents[0].glob('*.nc'))
+            if nc_files:
+                save_to_nc = False
+            else:
+                save_to_nc = True
+            ds = io.xr_stack_geotifs(dems_list, dem_dates, ref_dem.filename, save_to_nc=save_to_nc)
             nc_files = list(Path(dems_list[0]).parents[0].glob('*.nc'))
         
             t = len(ds.time)
@@ -796,13 +801,13 @@ def merge_and_calculate_ddems(groups, validation_dates, ref_dem, mode, outdir, o
                 ds = ds.drop(['spatial_ref']) 
                 ds.to_zarr(zarr_stack_tmp_fn)
                 ds = xr.open_dataset(zarr_stack_tmp_fn,
-                                     chunks={'time': t, 'y': y, 'x':x})
+                                     chunks={'time': t, 'y': y, 'x':x},engine='zarr')
                 ds['band1'].encoding = {'chunks': (t, y, x)}
                 ds.to_zarr(zarr_stack_fn)
                 shutil.rmtree(zarr_stack_tmp_fn, ignore_errors=True)
             
             ds = xr.open_dataset(zarr_stack_fn,
-                                 chunks={'time': t, 'y': y, 'x':x})
+                                 chunks={'time': t, 'y': y, 'x':x},engine='zarr')
 
             # TODO pass down client object to print address here instead of earlier.
 
@@ -818,7 +823,7 @@ def merge_and_calculate_ddems(groups, validation_dates, ref_dem, mode, outdir, o
                                                  'time', 
                                                  kwargs={'times':time_stamps,
                                                          'count_thresh':count_thresh,
-                                                         'time_delta_min': None})
+                                                         'time_delta_min': time_delta_min})
             
             start = datetime.now()
             results = xr.Dataset({'slope':results[0],

@@ -214,10 +214,10 @@ def main(case: dict, mode: str, run_name: str, sat_type: str = "ASTER", nproc: i
                     dems_ds = xr.open_dataset(zarr_stack_fn,
                                               chunks={'time': t, 'y': y, 'x':x},engine='zarr')
 
-#                     # cleanup the nc files
-#                     print('removing nc files')
-#                     for f in Path(dems_list[0]).parents[0].glob('*.nc'):
-#                         f.unlink(missing_ok=True)
+                    # cleanup the nc files
+                    print('removing nc files')
+                    for f in Path(dems_list[0]).parents[0].glob('*.nc'):
+                        f.unlink(missing_ok=True)
 
                 step = time() 
                 print(f"Took {(step-start)/60:.2f} minutes")
