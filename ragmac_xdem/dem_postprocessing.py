@@ -840,7 +840,7 @@ def merge_and_calculate_ddems(groups, validation_dates, ref_dem, mode, outdir, o
             min_date = np.percentile(ds.time, 2)
             max_date = np.percentile(ds.time, 98)
             time_delta_max = int((max_date - min_date).astype('timedelta64[D]') / np.timedelta64(1, 'D'))
-            time_delta_min = int(time_delta_max * 0.1)
+            time_delta_min = min(4*365, int(time_delta_max * 0.5))
             print("Min 2 percentile date:",np.datetime_as_string(min_date, unit='D'))
             print("Max 98 percentile date:",np.datetime_as_string(max_date, unit='D'))
             print("Time delta between dates:",time_delta_max, 'days')
