@@ -73,7 +73,7 @@ if __name__ == "__main__":
     if args.run is not None:
         all_runs = [args.run]
         
-    if args.qc or args.mode == "TimeSeries3":
+    if args.qc or args.mode == "TimeSeries3" or args.mode == "TimeSeries_full":
         # Launch dask cluster for computation on larger than memory arrays.
         client = io.dask_start_cluster(args.nproc)
 
