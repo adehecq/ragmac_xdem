@@ -86,12 +86,12 @@ def main(case: dict, mode: str, run_name: str, sat_type: str = "ASTER", nproc: i
         selection_opts = {"mode": "subperiod", "dt": 365}
         downsampling = 1
         merge_opts = {"mode": "TimeSeries3"}
-    elif mode == "TimeSeries4":
+    elif mode == "TimeSeries_full":
         selection_opts = {"mode": "subperiod", "dt": 10958} #~30 years
         downsampling = 1
         merge_opts = {"mode": "TimeSeries3"}
     else:
-        raise ValueError("`mode` must be either of 'DEMdiff_autoselect', 'DEMdiff_median', 'TimeSeries', 'TimeSeries2' or 'TimeSeries3'")
+        raise ValueError("`mode` must be either of 'DEMdiff_autoselect', 'DEMdiff_median', 'TimeSeries', 'TimeSeries2', 'TimeSeries3' or TimeSeries_full")
 
     # Get run parameters
     run = runs[run_name]

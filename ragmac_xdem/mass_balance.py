@@ -106,13 +106,21 @@ def fill_ddem_local_hypso(ddem, ref_dem, roi_mask, roi_outlines, filtering=True)
     `interp_residuals` the difference between input and interpolated ddem,
     `frac_obs` the fraction of observation for each feature in roi_outlines
     """
+    # Filter large outliers - as in Dussaillant et al. 2019 (DOI: 10.1038/s41561-019-0432-5)
+    if filtering:
+        slope = xdem.terrain.slope(ref_dem)
+        ddem_filt = ddem.copy()
+        ddem_filt.data.mask[slope.data > 45] = True
+    else:
+        ddem_filt = ddem
+
     # Calculate mean elevation change within elevation bins
     # TODO: filter pixels within each bins that are outliers
-    ddem_bins = xdem.volume.hypsometric_binning(ddem.data[roi_mask], ref_dem.data[roi_mask])
+    ddem_bins = xdem.volume.hypsometric_binning(ddem_filt.data[roi_mask], ref_dem.data[roi_mask], bins=100)
 
     # Filter outliers in bins
     if filtering:
-        ddem_bins_filtered = ddem_bins_filtering(ddem_bins, verbose=True)
+        ddem_bins_filtered = ddem_bins_filtering(ddem_bins, verbose=True, nmad_fact=-1)
     else:
         ddem_bins_filtered = ddem_bins.copy()
 
