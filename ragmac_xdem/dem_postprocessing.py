@@ -766,9 +766,7 @@ def merge_and_calculate_ddems(groups, validation_dates, ref_dem, mode, outdir, o
             pair_id = pair_ids[count]
             print(f"\nProcessing pair {pair_id}")
             
-            dems_list = groups[count]
             dem_dates = utils.get_dems_date(dems_list)
-             
             time_stamps = np.array(matplotlib.dates.date2num(dem_dates))
 #             time_stamps = np.array([utils.date_time_to_decyear(i) for i in dem_dates])
             
