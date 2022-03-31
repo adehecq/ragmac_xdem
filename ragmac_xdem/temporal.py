@@ -531,7 +531,7 @@ def dask_linreg(DataArray, times = None, count_thresh = None, time_delta_min = N
     
     if count_thresh:
         if np.sum(mask) < count_thresh:
-                return np.nan, np.nan
+            return np.nan, np.nan
     
     if time_delta_min:
         time_delta = max(times[mask]) - min(times[mask])

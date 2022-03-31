@@ -22,6 +22,7 @@ from skimage.morphology import disk
 from tqdm import tqdm
 import matplotlib
 import xarray as xr
+import zarr
 from pathlib import Path
 import shutil
 
@@ -771,20 +772,25 @@ def merge_and_calculate_ddems(groups, validation_dates, ref_dem, mode, outdir, o
             time_stamps = np.array(matplotlib.dates.date2num(dem_dates))
 #             time_stamps = np.array([utils.date_time_to_decyear(i) for i in dem_dates])
             
+            print('\nStacking DEMs',pair_id)
+            zarr_stack_fn = Path.joinpath(Path(dems_list[0]).parents[0],'stack.zarr')
+            zarr_stack_tmp_fn = Path.joinpath(Path(dems_list[0]).parents[0],'stack_tmp.zarr')
+            shutil.rmtree(zarr_stack_fn, ignore_errors=True)
+            shutil.rmtree(zarr_stack_tmp_fn, ignore_errors=True)
+        
+            print('Creating temporary nc files')
             ds = io.xr_stack_geotifs(dems_list, dem_dates, ref_dem.filename, save_to_nc=True)
             nc_files = list(Path(dems_list[0]).parents[0].glob('*.nc'))
         
+            print('Determining optimal chunk size')
             t = len(ds.time)
             x = len(ds.x)
             y = len(ds.y)
-            print('\ndata dims: x, y, time')
+            print('data dims: x, y, time')
             print('data shape:',x,y,t)
-            
-            ## Optimize chunking WIP
-            ds['band1'].data = ds['band1'].data.rechunk({0:-1, 1:'auto', 2:'auto'}, 
+            arr = ds['band1'].data.rechunk({0:-1, 1:'auto', 2:'auto'}, 
                                                         block_size_limit=1e8, 
                                                         balance=True)
-            arr = ds['band1'].data
             t,y,x = arr.chunks[0][0], arr.chunks[1][0], arr.chunks[2][0]
             tasks_count = io.dask_get_mapped_tasks(ds['band1'].data)
             chunksize = ds['band1'][:t,:y,:x].nbytes / 1048576
@@ -792,36 +798,55 @@ def merge_and_calculate_ddems(groups, validation_dates, ref_dem, mode, outdir, o
             print('chunk size:',np.round(chunksize,2), 'MiB')
             print('tasks:', tasks_count)
             
-            zarr_stack_fn = Path.joinpath(Path(dems_list[0]).parents[0],'stack.zarr')
-            zarr_stack_tmp_fn = Path.joinpath(Path(dems_list[0]).parents[0],'stack_tmp.zarr')
-            shutil.rmtree(zarr_stack_fn, ignore_errors=True)
-            shutil.rmtree(zarr_stack_tmp_fn, ignore_errors=True)
-            
-            print('Saving zarr stack to')
-            print(zarr_stack_fn)
- 
-            ds = xr.open_mfdataset(nc_files,parallel=True)
+            print('Creating temporary zarr stack')
+            print(zarr_stack_tmp_fn)
             ds = ds.drop(['spatial_ref']) 
             ds.to_zarr(zarr_stack_tmp_fn)
+            print('Zarr file info')
+            source_group = zarr.open(zarr_stack_tmp_fn)
+            source_array = source_group['band1']
+            print(source_group.tree())
+            print(source_array.info)
+            del source_group
+            del source_array
+            
+            print('Removing temporary nc files')
+            for f in Path(dems_list[0]).parents[0].glob('*.nc'):
+                f.unlink(missing_ok=True)
+            
+            print('Creating final zarr stack')
+            print(str(zarr_stack_fn))
             ds = xr.open_dataset(zarr_stack_tmp_fn,
                                  chunks={'time': t, 'y': y, 'x':x},engine='zarr')
             ds['band1'].encoding = {'chunks': (t, y, x)}
             ds.to_zarr(zarr_stack_fn)
+            print('Zarr file info')
+            source_group = zarr.open(zarr_stack_fn)
+            source_array = source_group['band1']
+            print(source_group.tree())
+            print(source_array.info)
+            del source_group
+            del source_array
                 
-            print('removing nc files')
-            for f in Path(dems_list[0]).parents[0].glob('*.nc'):
-                f.unlink(missing_ok=True)
+            print('Removing temporary zarr stack')
+            shutil.rmtree(zarr_stack_tmp_fn, ignore_errors=True)
             
+            print('\nComputing linear regression')
+            print('Check dask dashboard link printed above to monitor progress.')
             ds = xr.open_dataset(zarr_stack_fn,
                                  chunks={'time': t, 'y': y, 'x':x},engine='zarr')
             count_thresh = 5
-            print('\nExcluding pixels with count <',count_thresh)
-            
-            time_delta_min = None
-#             time_delta_min = 5
-#             print('Excluding pixels with max time delta <',time_delta_min, 'days')
-            
-            print('\nCheck dask dashboard link printed above to monitor linear regression progress.')
+            print('Excluding pixels with count <',count_thresh)
+            # if not using matplotlib.dates.date2num to convert time stamps, check delta is computed
+            # and reported correctly
+            min_date = np.percentile(ds.time, 2)
+            max_date = np.percentile(ds.time, 98)
+            time_delta_max = int((max_date - min_date).astype('timedelta64[D]') / np.timedelta64(1, 'D'))
+            time_delta_min = int(time_delta_max * 0.1)
+            print("Min 2 percentile date:",np.datetime_as_string(min_date, unit='D'))
+            print("Max 98 percentile date:",np.datetime_as_string(max_date, unit='D'))
+            print("Time delta between dates:",time_delta_max, 'days')
+            print('Excluding pixels with max time delta <',time_delta_min, 'days')
             results = temporal.dask_apply_linreg(ds['band1'],
                                                  'time', 
                                                  kwargs={'times':time_stamps,
@@ -837,9 +862,7 @@ def merge_and_calculate_ddems(groups, validation_dates, ref_dem, mode, outdir, o
             # need to convert timestamps back to yr-1 if using matplotlib.dates.date2num
             # these same conversions are used in temporal.ma_linreg()
             results['slope'] = results['slope'] * 365.25
-            
             slope = np.ma.masked_invalid(results['slope'].values)
-
             # Finally, calculate total elevation change
             date1 = validation_dates[k1]
             date2 = validation_dates[k2]
@@ -848,8 +871,8 @@ def merge_and_calculate_ddems(groups, validation_dates, ref_dem, mode, outdir, o
             dyear = (date2_dt - date1_dt).total_seconds() / (3600 * 24 * 365.25)
             ddems[pair_id] = dyear * slope
             
+            print('Removing final zarr stack')
             shutil.rmtree(zarr_stack_fn, ignore_errors=True)
-            shutil.rmtree(zarr_stack_tmp_fn, ignore_errors=True)
             
 
     else:
