@@ -785,17 +785,29 @@ def merge_and_calculate_ddems(groups, validation_dates, ref_dem, mode, outdir, o
             nc_files = list(Path(dems_list[0]).parents[0].glob('*.nc'))
         
             print('Determining optimal chunk size')
+            ## set chunk size to 1 MB if dataset < 1 GB in size
+            ## else increase to max of 1 GB chunk sizes.
+            ds_size = ds.nbytes / 1e9
+            if ds_size < 1:
+                chunk_size_limit = 1e6
+            elif ds_size < 10:
+                chunk_size_limit = 1e7
+            elif ds_size < 100:
+                chunk_size_limit = 1e8
+            else:
+                chunk_size_limit = 1e9
             t = len(ds.time)
             x = len(ds.x)
             y = len(ds.y)
             print('data dims: x, y, time')
             print('data shape:',x,y,t)
+            print('data size:' np.round(ds['band1'].nbytes / 2**20,2), 'MiB')
             arr = ds['band1'].data.rechunk({0:-1, 1:'auto', 2:'auto'}, 
-                                                        block_size_limit=1e6, 
+                                                        block_size_limit=chunk_size_limit, 
                                                         balance=True)
             t,y,x = arr.chunks[0][0], arr.chunks[1][0], arr.chunks[2][0]
             tasks_count = io.dask_get_mapped_tasks(ds['band1'].data)
-            chunksize = ds['band1'][:t,:y,:x].nbytes / 1048576
+            chunksize = ds['band1'][:t,:y,:x].nbytes / 2**20
             print('chunk shape:', x,y,t)
             print('chunk size:',np.round(chunksize,2), 'MiB')
             print('tasks:', tasks_count)
@@ -853,7 +865,7 @@ def merge_and_calculate_ddems(groups, validation_dates, ref_dem, mode, outdir, o
 #             print("Time delta between dates:",time_delta_max, 'days')
             
             ## using validation time period to compute time_delta_min threshold
-            time_delta_max = (date2_dt - date1_dt).total_seconds() / (3600 * 24)
+            time_delta_max = int((date2_dt - date1_dt).total_seconds() / (3600 * 24))
             time_delta_min = min(4*365, int(time_delta_max * 0.5))
             print("Time delta between validation dates:",time_delta_max, 'days')
             print('Excluding pixels with max time delta <',time_delta_min, 'days')

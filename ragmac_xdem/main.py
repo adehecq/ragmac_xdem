@@ -174,17 +174,29 @@ def main(case: dict, mode: str, run_name: str, sat_type: str = "ASTER", nproc: i
                 nc_files = list(Path(dems_list[0]).parents[0].glob('*.nc'))
 
                 print('Determining optimal chunk size')
+                ## set chunk size to 1 MB if dataset < 1 GB in size
+                ## else increase to max of 1 GB chunk sizes.
+                ds_size = dems_ds.nbytes / 1e9
+                if ds_size < 1:
+                    chunk_size_limit = 1e6
+                elif ds_size < 10:
+                    chunk_size_limit = 1e7
+                elif ds_size < 100:
+                    chunk_size_limit = 1e8
+                else:
+                    chunk_size_limit = 1e9
                 t = len(dems_ds.time)
                 x = len(dems_ds.x)
                 y = len(dems_ds.y)
                 print('data dims: x, y, time')
                 print('data shape:',x,y,t)
+                print('data size:' np.round(dems_ds['band1'].nbytes / 2**20,2), 'MiB')
                 arr = dems_ds['band1'].data.rechunk({0:-1, 1:'auto', 2:'auto'}, 
-                                                                      block_size_limit=1e8, 
+                                                                      block_size_limit=chunk_size_limit, 
                                                                       balance=True)
                 t,y,x = arr.chunks[0][0], arr.chunks[1][0], arr.chunks[2][0]
                 tasks_count = io.dask_get_mapped_tasks(dems_ds['band1'].data)
-                chunksize = dems_ds['band1'][:t,:y,:x].nbytes / 1048576
+                chunksize = dems_ds['band1'][:t,:y,:x].nbytes / 2**20
                 print('chunk shape:', x,y,t)
                 print('chunk size:',np.round(chunksize,2), 'MiB')
                 print('tasks:', tasks_count)
@@ -251,17 +263,27 @@ def main(case: dict, mode: str, run_name: str, sat_type: str = "ASTER", nproc: i
                 nc_files = list(Path(dems_coreg_list[0]).parents[0].glob('*.nc'))
 
                 print('Determining optimal chunk size')
+                ds_size = dems_coreg_ds.nbytes / 1e9
+                if ds_size < 1:
+                    chunk_size_limit = 1e6
+                elif ds_size < 10:
+                    chunk_size_limit = 1e7
+                elif ds_size < 100:
+                    chunk_size_limit = 1e8
+                else:
+                    chunk_size_limit = 1e9
                 t = len(dems_coreg_ds.time)
                 x = len(dems_coreg_ds.x)
                 y = len(dems_coreg_ds.y)
                 print('data dims: x, y, time')
                 print('data shape:',x,y,t)
+                print('data size:' np.round(dems_coreg_ds['band1'].nbytes / 2**20,2), 'MiB')
                 arr = dems_coreg_ds['band1'].data.rechunk({0:-1, 1:'auto', 2:'auto'}, 
-                                                                      block_size_limit=1e8, 
+                                                                      block_size_limit=chunk_size_limit, 
                                                                       balance=True)
                 t,y,x = arr.chunks[0][0], arr.chunks[1][0], arr.chunks[2][0]
                 tasks_count = io.dask_get_mapped_tasks(dems_coreg_ds['band1'].data)
-                chunksize = dems_coreg_ds['band1'][:t,:y,:x].nbytes / 1048576
+                chunksize = dems_coreg_ds['band1'][:t,:y,:x].nbytes / 2**20
                 print('chunk shape:', x,y,t)
                 print('chunk size:',np.round(chunksize,2), 'MiB')
                 print('tasks:', tasks_count)
