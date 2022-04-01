@@ -802,9 +802,9 @@ def merge_and_calculate_ddems(groups, validation_dates, ref_dem, mode, outdir, o
             
             print('Creating rechunked zarr stack')
             print(str(zarr_stack_fn),'\n')
-            ## write chunks to be 1 GiB on disk
+            ## write chunks to be 500 MB on disk
             arr = ds['band1'].data.rechunk({0:-1, 1:'auto', 2:'auto'}, 
-                                                        block_size_limit=2**30, 
+                                                        block_size_limit=5e8, 
                                                         balance=True)
             t,y,x = arr.chunks[0][0], arr.chunks[1][0], arr.chunks[2][0]
             ds = xr.open_dataset(zarr_stack_tmp_fn,

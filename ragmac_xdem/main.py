@@ -195,9 +195,9 @@ def main(case: dict, mode: str, run_name: str, sat_type: str = "ASTER", nproc: i
                 
                 print('Creating rechunked zarr stack')
                 print(str(zarr_stack_fn))
-                ## write chunks to be 1 GiB on disk
+                ## write chunks to be 500 MB on disk
                 arr = dems_ds['band1'].data.rechunk({0:-1, 1:'auto', 2:'auto'}, 
-                                                            block_size_limit=2**30, 
+                                                            block_size_limit=5e8, 
                                                             balance=True)
                 t,y,x = arr.chunks[0][0], arr.chunks[1][0], arr.chunks[2][0]
                 dems_ds = xr.open_dataset(zarr_stack_tmp_fn,
@@ -285,9 +285,9 @@ def main(case: dict, mode: str, run_name: str, sat_type: str = "ASTER", nproc: i
                 
                 print('Creating rechunked zarr stack')
                 print(str(zarr_stack_coreg_fn))
-                ## write chunks to be 1 GiB on disk
+                ## write chunks to be 500 MB on disk
                 arr = dems_coreg_ds['band1'].data.rechunk({0:-1, 1:'auto', 2:'auto'}, 
-                                                                      block_size_limit=2**30, 
+                                                                      block_size_limit=5e8, 
                                                                       balance=True)
                 t,y,x = arr.chunks[0][0], arr.chunks[1][0], arr.chunks[2][0]
                 dems_coreg_ds = xr.open_dataset(zarr_stack_coreg_tmp_fn,
