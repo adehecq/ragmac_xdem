@@ -160,6 +160,9 @@ def main(case: dict, mode: str, run_name: str, sat_type: str = "ASTER", nproc: i
 
             if not os.path.exists(outfig) or overwrite:
                 #TODO create function to handle both coregistered and raw dems
+                #TODO make chunk sizes for final computation 1D array size dependant
+                #instead of dependaing on size of full stack. 
+                #see example in TimeSeries3 mode in dem_postprocessing.py
                 print('\nPeriod',pair_id)
                 
                 ### RAW DEMs ### 
