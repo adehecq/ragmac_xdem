@@ -216,16 +216,14 @@ def main(case: dict, mode: str, run_name: str, sat_type: str = "ASTER", nproc: i
                 shutil.rmtree(zarr_stack_tmp_fn, ignore_errors=True)
                 
                 print('\nDetermining optimal chunk size for processing')
-                ## min 1 MB max 1 GB
+                ## min 1 MB max 100 MB
                 ds_size = dems_ds['band1'].nbytes / 1e9
                 if ds_size < 1:
                     chunk_size_limit = 1e6
-                elif ds_size < 10:
-                    chunk_size_limit = 1e7
                 elif ds_size < 100:
-                    chunk_size_limit = 1e8
+                    chunk_size_limit = 1e7
                 else:
-                    chunk_size_limit = 1e9
+                    chunk_size_limit = 1e8
                 t = len(dems_ds.time)
                 x = len(dems_ds.x)
                 y = len(dems_ds.y)
@@ -236,7 +234,7 @@ def main(case: dict, mode: str, run_name: str, sat_type: str = "ASTER", nproc: i
                                                                       block_size_limit=chunk_size_limit, 
                                                                       balance=True)
                 t,y,x = arr.chunks[0][0], arr.chunks[1][0], arr.chunks[2][0]
-                tasks_count = io.dask_get_mapped_tasks(dems_ds['band1'].data)
+                tasks_count = io.dask_get_mapped_tasks(arr)
                 chunksize = dems_ds['band1'][:t,:y,:x].nbytes / 1e6
                 print('chunk shape:', x,y,t)
                 print('chunk size:',np.round(chunksize,2), 'MB')
@@ -309,16 +307,14 @@ def main(case: dict, mode: str, run_name: str, sat_type: str = "ASTER", nproc: i
                 print(f"Took {(step-start)/60:.2f} minutes")
 
                 print('\nDetermining optimal chunk size for processing')
-                ## min 1 MB max 1 GB
+                ## min 1 MB max 100 MB
                 ds_size = dems_coreg_ds['band1'].nbytes / 1e9
                 if ds_size < 1:
                     chunk_size_limit = 1e6
-                elif ds_size < 10:
-                    chunk_size_limit = 1e7
                 elif ds_size < 100:
-                    chunk_size_limit = 1e8
+                    chunk_size_limit = 1e7
                 else:
-                    chunk_size_limit = 1e9
+                    chunk_size_limit = 1e8
                 t = len(dems_coreg_ds.time)
                 x = len(dems_coreg_ds.x)
                 y = len(dems_coreg_ds.y)
@@ -329,7 +325,7 @@ def main(case: dict, mode: str, run_name: str, sat_type: str = "ASTER", nproc: i
                                                                       block_size_limit=chunk_size_limit, 
                                                                       balance=True)
                 t,y,x = arr.chunks[0][0], arr.chunks[1][0], arr.chunks[2][0]
-                tasks_count = io.dask_get_mapped_tasks(dems_coreg_ds['band1'].data)
+                tasks_count = io.dask_get_mapped_tasks(arr)
                 chunksize = dems_coreg_ds['band1'][:t,:y,:x].nbytes / 1e6
                 print('chunk shape:', x,y,t)
                 print('chunk size:',np.round(chunksize,2), 'MB')
