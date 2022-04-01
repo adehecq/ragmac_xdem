@@ -867,7 +867,7 @@ def merge_and_calculate_ddems(groups, validation_dates, ref_dem, mode, outdir, o
             
             ## using validation time period to compute time_delta_min threshold
             time_delta_max = int((date2_dt - date1_dt).total_seconds() / (3600 * 24))
-            time_delta_min = min(4*365, int(time_delta_max * 0.5))
+            time_delta_min = max(4*365, int(time_delta_max * 0.5))
             print("Time delta between validation dates:",time_delta_max, 'days')
             print('Excluding pixels with max time delta <',time_delta_min, 'days')
             results = temporal.dask_apply_linreg(ds['band1'],
