@@ -764,6 +764,10 @@ def merge_and_calculate_ddems(groups, validation_dates, ref_dem, mode, outdir, o
             k1, k2 = pair
             dems_list = groups[count]
             pair_id = pair_ids[count]
+            date1 = validation_dates[k1]
+            date2 = validation_dates[k2]
+            date1_dt = datetime.strptime(date1, "%Y-%m-%d")
+            date2_dt = datetime.strptime(date2, "%Y-%m-%d")
             print(f"\nProcessing pair {pair_id}")
             
             dem_dates = utils.get_dems_date(dems_list)
@@ -787,7 +791,7 @@ def merge_and_calculate_ddems(groups, validation_dates, ref_dem, mode, outdir, o
             print('data dims: x, y, time')
             print('data shape:',x,y,t)
             arr = ds['band1'].data.rechunk({0:-1, 1:'auto', 2:'auto'}, 
-                                                        block_size_limit=1e8, 
+                                                        block_size_limit=1e6, 
                                                         balance=True)
             t,y,x = arr.chunks[0][0], arr.chunks[1][0], arr.chunks[2][0]
             tasks_count = io.dask_get_mapped_tasks(ds['band1'].data)
@@ -835,15 +839,23 @@ def merge_and_calculate_ddems(groups, validation_dates, ref_dem, mode, outdir, o
                                  chunks={'time': t, 'y': y, 'x':x},engine='zarr')
             count_thresh = 5
             print('Excluding pixels with count <',count_thresh)
-            # if not using matplotlib.dates.date2num to convert time stamps, check delta is computed
-            # and reported correctly
-            min_date = np.percentile(ds.time, 2)
-            max_date = np.percentile(ds.time, 98)
-            time_delta_max = int((max_date - min_date).astype('timedelta64[D]') / np.timedelta64(1, 'D'))
+            
+            ## if not using matplotlib.dates.date2num to convert time stamps, check delta is computed
+            ## and reported correctly
+            
+            ## using time series of available DEMs to compute time_delta_min threshold
+#             min_date = np.percentile(ds.time, 2) # in case of outlier DEMs in time
+#             max_date = np.percentile(ds.time, 98)
+#             time_delta_max = int((max_date - min_date).astype('timedelta64[D]') / np.timedelta64(1, 'D'))
+#             time_delta_min = min(4*365, int(time_delta_max * 0.5))
+#             print("Min 2 percentile date:",np.datetime_as_string(min_date, unit='D'))
+#             print("Max 98 percentile date:",np.datetime_as_string(max_date, unit='D'))
+#             print("Time delta between dates:",time_delta_max, 'days')
+            
+            ## using validation time period to compute time_delta_min threshold
+            time_delta_max = (date2_dt - date1_dt).total_seconds() / (3600 * 24)
             time_delta_min = min(4*365, int(time_delta_max * 0.5))
-            print("Min 2 percentile date:",np.datetime_as_string(min_date, unit='D'))
-            print("Max 98 percentile date:",np.datetime_as_string(max_date, unit='D'))
-            print("Time delta between dates:",time_delta_max, 'days')
+            print("Time delta between validation dates:",time_delta_max, 'days')
             print('Excluding pixels with max time delta <',time_delta_min, 'days')
             results = temporal.dask_apply_linreg(ds['band1'],
                                                  'time', 
@@ -861,11 +873,8 @@ def merge_and_calculate_ddems(groups, validation_dates, ref_dem, mode, outdir, o
             # these same conversions are used in temporal.ma_linreg()
             results['slope'] = results['slope'] * 365.25
             slope = np.ma.masked_invalid(results['slope'].values)
+            
             # Finally, calculate total elevation change
-            date1 = validation_dates[k1]
-            date2 = validation_dates[k2]
-            date1_dt = datetime.strptime(date1, "%Y-%m-%d")
-            date2_dt = datetime.strptime(date2, "%Y-%m-%d")
             dyear = (date2_dt - date1_dt).total_seconds() / (3600 * 24 * 365.25)
             ddems[pair_id] = dyear * slope
             
