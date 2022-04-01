@@ -783,34 +783,6 @@ def merge_and_calculate_ddems(groups, validation_dates, ref_dem, mode, outdir, o
             print('Creating temporary nc files')
             ds = io.xr_stack_geotifs(dems_list, dem_dates, ref_dem.filename, save_to_nc=True)
             nc_files = list(Path(dems_list[0]).parents[0].glob('*.nc'))
-        
-            print('Determining optimal chunk size')
-            ## set chunk size to 1 MB if dataset < 1 GB in size
-            ## else increase to max of 1 GB chunk sizes.
-            ds_size = ds.nbytes / 1e9
-            if ds_size < 1:
-                chunk_size_limit = 1e6
-            elif ds_size < 10:
-                chunk_size_limit = 1e7
-            elif ds_size < 100:
-                chunk_size_limit = 1e8
-            else:
-                chunk_size_limit = 1e9
-            t = len(ds.time)
-            x = len(ds.x)
-            y = len(ds.y)
-            print('data dims: x, y, time')
-            print('data shape:',x,y,t)
-            print('data size:' np.round(ds['band1'].nbytes / 2**20,2), 'MiB')
-            arr = ds['band1'].data.rechunk({0:-1, 1:'auto', 2:'auto'}, 
-                                                        block_size_limit=chunk_size_limit, 
-                                                        balance=True)
-            t,y,x = arr.chunks[0][0], arr.chunks[1][0], arr.chunks[2][0]
-            tasks_count = io.dask_get_mapped_tasks(ds['band1'].data)
-            chunksize = ds['band1'][:t,:y,:x].nbytes / 2**20
-            print('chunk shape:', x,y,t)
-            print('chunk size:',np.round(chunksize,2), 'MiB')
-            print('tasks:', tasks_count)
             
             print('Creating temporary zarr stack')
             print(zarr_stack_tmp_fn)
@@ -828,8 +800,13 @@ def merge_and_calculate_ddems(groups, validation_dates, ref_dem, mode, outdir, o
             for f in Path(dems_list[0]).parents[0].glob('*.nc'):
                 f.unlink(missing_ok=True)
             
-            print('Creating final zarr stack')
+            print('Creating rechunked zarr stack')
             print(str(zarr_stack_fn))
+            ## write chunks to be 1 GiB on disk
+            arr = ds['band1'].data.rechunk({0:-1, 1:'auto', 2:'auto'}, 
+                                                        block_size_limit=2**30, 
+                                                        balance=True)
+            t,y,x = arr.chunks[0][0], arr.chunks[1][0], arr.chunks[2][0]
             ds = xr.open_dataset(zarr_stack_tmp_fn,
                                  chunks={'time': t, 'y': y, 'x':x},engine='zarr')
             ds['band1'].encoding = {'chunks': (t, y, x)}
@@ -845,6 +822,34 @@ def merge_and_calculate_ddems(groups, validation_dates, ref_dem, mode, outdir, o
             print('Removing temporary zarr stack')
             shutil.rmtree(zarr_stack_tmp_fn, ignore_errors=True)
             
+            print('\nDetermining optimal chunk size for processing')
+            ## set chunk size to 1 MB if dataset < 1 GB in size
+            ## else increase to max of 1 GB chunk sizes.
+            ds_size = ds['band1'].nbytes / 1e9
+            if ds_size < 1:
+                chunk_size_limit = 1e6
+            elif ds_size < 10:
+                chunk_size_limit = 1e7
+            elif ds_size < 100:
+                chunk_size_limit = 1e8
+            else:
+                chunk_size_limit = 1e9
+            t = len(ds.time)
+            x = len(ds.x)
+            y = len(ds.y)
+            print('data dims: x, y, time')
+            print('data shape:',x,y,t)
+            print('data size:',np.round(ds_size,2), 'GB')
+            arr = ds['band1'].data.rechunk({0:-1, 1:'auto', 2:'auto'}, 
+                                                        block_size_limit=chunk_size_limit, 
+                                                        balance=True)
+            t,y,x = arr.chunks[0][0], arr.chunks[1][0], arr.chunks[2][0]
+            tasks_count = io.dask_get_mapped_tasks(ds['band1'].data)
+            chunksize = ds['band1'][:t,:y,:x].nbytes / 1e6
+            print('chunk shape:', x,y,t)
+            print('chunk size:',np.round(chunksize,2), 'MB')
+            print('tasks:', tasks_count)
+
             print('\nComputing linear regression')
             print('Check dask dashboard link printed above to monitor progress.')
             ds = xr.open_dataset(zarr_stack_fn,
