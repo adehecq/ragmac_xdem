@@ -60,7 +60,7 @@ if __name__ == "__main__":
 
     # List all possible cases, modes and runs to be processed
     all_cases = ["PK_Baltoro", "RU_FJL", "CL_NPI"]
-    all_modes = ["DEMdiff_median", "DEMdiff_autoselect", "TimeSeries"]
+    all_modes = ["DEMdiff_median", "DEMdiff_autoselect", "TimeSeries3"]
     all_runs = main.runs.keys()
 
     # Select either all or user selected

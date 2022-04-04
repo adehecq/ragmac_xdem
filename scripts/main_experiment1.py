@@ -60,7 +60,7 @@ if __name__ == "__main__":
 
     # List all possible cases, modes and runs to be processed
     all_cases = ["CH_Aletschgletscher", "AT_Hintereisferner", "NO_Vestisen"]
-    all_modes = ["DEMdiff_median", "DEMdiff_autoselect", "TimeSeries"]
+    all_modes = ["DEMdiff_median", "DEMdiff_autoselect", "TimeSeries3", "TimeSeries_full"]
     run = args.run
 
     # Select either all or user selected
