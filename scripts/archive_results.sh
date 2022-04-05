@@ -28,7 +28,7 @@ rm -f $outfile  # To avoid appending to existing file
 for exp in experiment_1 experiment_2
 do
 
-    for dir in $exp/*/*
+    for dir in $exp/*/results*
     do
 	cmd="tar --append --file=$outfile $dir"
 	echo $cmd; `$cmd`
