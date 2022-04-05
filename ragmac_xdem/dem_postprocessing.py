@@ -764,6 +764,10 @@ def merge_and_calculate_ddems(groups, validation_dates, ref_dem, mode, outdir, o
             k1, k2 = pair
             dems_list = groups[count]
             pair_id = pair_ids[count]
+            date1 = validation_dates[k1]
+            date2 = validation_dates[k2]
+            date1_dt = datetime.strptime(date1, "%Y-%m-%d")
+            date2_dt = datetime.strptime(date2, "%Y-%m-%d")
             print(f"\nProcessing pair {pair_id}")
             
             dem_dates = utils.get_dems_date(dems_list)
@@ -779,22 +783,6 @@ def merge_and_calculate_ddems(groups, validation_dates, ref_dem, mode, outdir, o
             print('Creating temporary nc files')
             ds = io.xr_stack_geotifs(dems_list, dem_dates, ref_dem.filename, save_to_nc=True)
             nc_files = list(Path(dems_list[0]).parents[0].glob('*.nc'))
-        
-            print('Determining optimal chunk size')
-            t = len(ds.time)
-            x = len(ds.x)
-            y = len(ds.y)
-            print('data dims: x, y, time')
-            print('data shape:',x,y,t)
-            arr = ds['band1'].data.rechunk({0:-1, 1:'auto', 2:'auto'}, 
-                                                        block_size_limit=1e8, 
-                                                        balance=True)
-            t,y,x = arr.chunks[0][0], arr.chunks[1][0], arr.chunks[2][0]
-            tasks_count = io.dask_get_mapped_tasks(ds['band1'].data)
-            chunksize = ds['band1'][:t,:y,:x].nbytes / 1048576
-            print('chunk shape:', x,y,t)
-            print('chunk size:',np.round(chunksize,2), 'MiB')
-            print('tasks:', tasks_count)
             
             print('Creating temporary zarr stack')
             print(zarr_stack_tmp_fn)
@@ -812,13 +800,18 @@ def merge_and_calculate_ddems(groups, validation_dates, ref_dem, mode, outdir, o
             for f in Path(dems_list[0]).parents[0].glob('*.nc'):
                 f.unlink(missing_ok=True)
             
-            print('Creating final zarr stack')
-            print(str(zarr_stack_fn))
+            print('Creating rechunked zarr stack')
+            print(str(zarr_stack_fn),'\n')
+            ## write chunks to be 100 MB on disk
+            arr = ds['band1'].data.rechunk({0:-1, 1:'auto', 2:'auto'}, 
+                                                        block_size_limit=1e8, 
+                                                        balance=True)
+            t,y,x = arr.chunks[0][0], arr.chunks[1][0], arr.chunks[2][0]
             ds = xr.open_dataset(zarr_stack_tmp_fn,
                                  chunks={'time': t, 'y': y, 'x':x},engine='zarr')
             ds['band1'].encoding = {'chunks': (t, y, x)}
             ds.to_zarr(zarr_stack_fn)
-            print('Zarr file info')
+            print('\nZarr file info')
             source_group = zarr.open(zarr_stack_fn)
             source_array = source_group['band1']
             print(source_group.tree())
@@ -829,21 +822,53 @@ def merge_and_calculate_ddems(groups, validation_dates, ref_dem, mode, outdir, o
             print('Removing temporary zarr stack')
             shutil.rmtree(zarr_stack_tmp_fn, ignore_errors=True)
             
-            print('\nComputing linear regression')
-            print('Check dask dashboard link printed above to monitor progress.')
+            print('\nDetermining optimal chunk size for processing')
+            ## set chunk size to 1 MB if single time series array < 1 MB in size
+            ## else increase to max of 1 GB chunk sizes.
+            time_series_array_size = ds['band1'].sel(x=ds['band1'].x.values[0], y=ds['band1'].y.values[0]).nbytes
+            if time_series_array_size < 1e6:
+                chunk_size_limit = 2e6
+            elif time_series_array_size < 1e7:
+                chunk_size_limit = 2e7
+            elif time_series_array_size < 1e8:
+                chunk_size_limit = 2e8
+            else:
+                chunk_size_limit = 1e9
+            ds_size = ds['band1'].nbytes / 1e9
+            t = len(ds.time)
+            x = len(ds.x)
+            y = len(ds.y)
+            arr = ds['band1'].data.rechunk({0:-1, 1:'auto', 2:'auto'}, 
+                                                        block_size_limit=chunk_size_limit, 
+                                                        balance=True)
+            tc,yc,xc = arr.chunks[0][0], arr.chunks[1][0], arr.chunks[2][0]
+            tasks_count = io.dask_get_mapped_tasks(arr)
+            chunksize = ds['band1'][:tc,:yc,:xc].nbytes / 1e6
+
+            
+            
             ds = xr.open_dataset(zarr_stack_fn,
-                                 chunks={'time': t, 'y': y, 'x':x},engine='zarr')
+                                 chunks={'time': tc, 'y': yc, 'x':xc},engine='zarr')
+            print('\nComputing linear regression')
             count_thresh = 5
             print('Excluding pixels with count <',count_thresh)
-            # if not using matplotlib.dates.date2num to convert time stamps, check delta is computed
-            # and reported correctly
-            min_date = np.percentile(ds.time, 2)
-            max_date = np.percentile(ds.time, 98)
-            time_delta_max = int((max_date - min_date).astype('timedelta64[D]') / np.timedelta64(1, 'D'))
-            time_delta_min = min(4*365, int(time_delta_max * 0.5))
-            print("Min 2 percentile date:",np.datetime_as_string(min_date, unit='D'))
-            print("Max 98 percentile date:",np.datetime_as_string(max_date, unit='D'))
-            print("Time delta between dates:",time_delta_max, 'days')
+            
+            ## if not using matplotlib.dates.date2num to convert time stamps, check delta is computed
+            ## and reported correctly
+            
+            ## using time series of available DEMs to compute time_delta_min threshold
+#             min_date = np.percentile(ds.time, 2) # in case of outlier DEMs in time
+#             max_date = np.percentile(ds.time, 98)
+#             time_delta_max = int((max_date - min_date).astype('timedelta64[D]') / np.timedelta64(1, 'D'))
+#             time_delta_min = min(4*365, int(time_delta_max * 0.5))
+#             print("Min 2 percentile date:",np.datetime_as_string(min_date, unit='D'))
+#             print("Max 98 percentile date:",np.datetime_as_string(max_date, unit='D'))
+#             print("Time delta between dates:",time_delta_max, 'days')
+            
+            ## using validation time period to compute time_delta_min threshold
+            time_delta_max = int((date2_dt - date1_dt).total_seconds() / (3600 * 24))
+            time_delta_min = max(4*365, int(time_delta_max * 0.5))
+            print("Time delta between validation dates:",time_delta_max, 'days')
             print('Excluding pixels with max time delta <',time_delta_min, 'days')
             results = temporal.dask_apply_linreg(ds['band1'],
                                                  'time', 
@@ -852,7 +877,20 @@ def merge_and_calculate_ddems(groups, validation_dates, ref_dem, mode, outdir, o
                                                          'time_delta_min': time_delta_min})
             start = datetime.now()
             results = xr.Dataset({'slope':results[0],
-                                  'intercept':results[1]}).compute()
+                                  'intercept':results[1]})
+            
+            tasks_count = io.dask_get_mapped_tasks(results['slope'].data)
+            print('\nStarting computation')
+            print('Check dask dashboard link printed above to monitor progress')
+            print('\ndata dims: x, y, time')
+            print('data shape:',x,y,t)
+            print('data size:',np.round(ds_size,2), 'GB')
+            print('1D time series array size:',np.round(time_series_array_size/ 1e6,5), 'MB')
+            print('chunk shape:', xc,yc,tc)
+            print('chunk size:',np.round(chunksize,2), 'MB')
+            print('tasks:', tasks_count)
+            results = results.compute()
+            
             now = datetime.now()
             dt = now - start
             print("Elapsed dask compute time:", str(dt).split(".")[0])
@@ -861,11 +899,8 @@ def merge_and_calculate_ddems(groups, validation_dates, ref_dem, mode, outdir, o
             # these same conversions are used in temporal.ma_linreg()
             results['slope'] = results['slope'] * 365.25
             slope = np.ma.masked_invalid(results['slope'].values)
+            
             # Finally, calculate total elevation change
-            date1 = validation_dates[k1]
-            date2 = validation_dates[k2]
-            date1_dt = datetime.strptime(date1, "%Y-%m-%d")
-            date2_dt = datetime.strptime(date2, "%Y-%m-%d")
             dyear = (date2_dt - date1_dt).total_seconds() / (3600 * 24 * 365.25)
             ddems[pair_id] = dyear * slope
             
