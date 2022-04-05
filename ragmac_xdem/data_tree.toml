@@ -44,7 +44,7 @@ aster_path = "DEM*tif"
 validation_dates = ["2000-02-01", "2012-10-01", "2019-10-01"]
 
 ["RU_FJL"]
-ref_dem_path = "RU_FJL_Copernicus_REF_DEM.tif"
+ref_dem_path = "RU_FJL_Copernicus_REF_DEM_30m.tif"
 rgi_path = "09_rgi60_rua_wgs83_utm40n.shp"
 selected_path = "09_rgi60_rua_wgs83_utm40n_fjl_selection.shp"
 tdx_path = "*dem_mcf.tif"
