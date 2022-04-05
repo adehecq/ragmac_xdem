@@ -284,6 +284,14 @@ def dems_selection(
         raise ValueError(f"Mode {mode} not recognized")
 
 
+def median_date(dates):
+    """
+    Returns the median date from a list of datetime objects. The output is rounded to the nearest day.
+    """
+    med_ordinal = np.median([date.toordinal() for date in dates])
+    return datetime.fromordinal(int(med_ordinal))
+
+
 def get_start_end_dates(groups, merge_mode, validation_dates):
     """
     Returns the first and last dates of the DEM subgroup used for each subperiod, depending on the merging method set.
@@ -300,8 +308,8 @@ def get_start_end_dates(groups, merge_mode, validation_dates):
         for count, pair in enumerate(pair_indexes):
             k1, k2 = pair
             pair_id = pair_ids[count]
-            start_date[pair_id] = np.min(get_dems_date(groups[k1]))
-            end_date[pair_id] = np.max(get_dems_date(groups[k2]))
+            start_date[pair_id] = median_date(get_dems_date(groups[k1]))
+            end_date[pair_id] = median_date(get_dems_date(groups[k2]))
 
     elif (merge_mode == "TimeSeries") or (merge_mode == "TimeSeries2") or (merge_mode == "TimeSeries3"):
 
