@@ -38,55 +38,6 @@ def dask_start_cluster(nproc, threads=1, ip_addres=None, port=':8786'):
     print('Threads per worker:', threads, '\n')
     return client
 
-def optimize_dask_chunks(ds,
-                         min_chunk_size = 1,
-                         max_chunk_size = 10):
-    """
-    Function to optimize shape and size of dask chunk.
-    Finds square root of dim length, then increments chunk shape 
-    by square root until size > min_chunk_size and < max_chunk_size.
-    Chunk sizes measured in MiB.
-    """
-
-    ### More info at https://blog.dask.org/2021/11/02/choosing-dask-chunk-sizes#what-to-watch-for-on-the-dashboard
-    ### larger chunk sizes (e.g. 100 MiB) performed slower when analyzing the task graph and performance.
-    ### WIP
-    
-    t = len(ds.time)
-    x = len(ds.x)
-    y = len(ds.y)
-    
-    #Find something that is close to a multiple of dim length
-    multiple_of_x = round(np.sqrt(x))
-    while multiple_of_x > 100:
-        multiple_of_x = round(np.sqrt(multiple_of_x))
-        
-    multiple_of_y = round(np.sqrt(y))
-    while multiple_of_y > 100:
-        multiple_of_y = round(np.sqrt(multiple_of_y))
-
-    #Adjust chunk size
-    x = multiple_of_x
-    y = multiple_of_y
-    chunksize = ds['band1'][:t,:y,:x].nbytes / 1048576 # convert to MiB
-
-    if chunksize < min_chunk_size or chunksize > max_chunk_size:
-        while chunksize < min_chunk_size:
-            x += multiple_of_x
-            y += multiple_of_y
-            chunksize = ds['band1'][:t,:y,:x].nbytes / 1048576
-        
-        while chunksize > max_chunk_size:
-            x -= multiple_of_x
-            y -= multiple_of_y
-            chunksize = ds['band1'][:t,:y,:x].nbytes / 1048576
-    
-    #Round off single digits
-    x = 10* int(np.ceil(x/10))
-    y = 10* int(np.ceil(y/10))
-
-    return x, y, t
-
 def dask_get_mapped_tasks(dask_array):
     """
     Finds tasks associated with chunked dask array.
