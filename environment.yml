@@ -8,7 +8,8 @@ dependencies:
   - matplotlib
   - toml
   - pandas
-  - xdem
+  - xdem = 0.0.6
+  - geoutils = 0.0.8
   - rioxarray
   - opencv
   - oggm
@@ -20,6 +21,3 @@ dependencies:
   - pip
   # dev requirements
   - pytest
-  - pip:
-    - -e "git+https://github.com/GlacioHack/GeoUtils.git@main#egg=geoutils"
-    - -e "git+https://github.com/GlacioHack/xdem.git@main#egg=xdem"
