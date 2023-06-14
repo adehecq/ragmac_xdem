@@ -3,12 +3,16 @@ channels:
   - conda-forge
   - oggm
 dependencies:
-  - numpy
-  - scipy
+  - python = 3.9
+  - numpy = 1.21
+  - scipy = 1.7
   - matplotlib
-  - toml
-  - pandas
-  - xdem
+  - toml = 0.10
+  - numba = 0.55
+  - pandas = 1.3
+  - xdem = 0.0.6
+  - geoutils = 0.0.8
+  - rasterio = 1.2.10
   - rioxarray
   - opencv
   - oggm
@@ -20,6 +24,3 @@ dependencies:
   - pip
   # dev requirements
   - pytest
-  - pip:
-    - -e "git+https://github.com/GlacioHack/GeoUtils.git@main#egg=geoutils"
-    - -e "git+https://github.com/GlacioHack/xdem.git@main#egg=xdem"
